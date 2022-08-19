@@ -8,7 +8,7 @@ from transformers import (
 from typing import Optional
 from dataclasses import dataclass, field
 
-from mps.models.utils import HFModelArguments
+from src.mps.models.utils import HFModelArguments
 import logging
 
 logger = logging.getLogger(name=__name__)
@@ -40,7 +40,7 @@ def load_soft_prompt_model(model_args: SoftPromptModelArguments):
     base_model = AutoModel.from_pretrained(
         model_args.model_name_or_path, cache_dir=model_args.cache_dir
     )
-    if model_args.tokenizer:
+    if model_args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(
             model_args.tokenizer, cache_dir=model_args.cache_dir
         )

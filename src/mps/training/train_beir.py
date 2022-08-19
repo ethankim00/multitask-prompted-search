@@ -1,6 +1,6 @@
 """ Train Models on BEIR datasets using the sentence transformers API"""
 
-from mps.models import SoftPromptModelArguments, load_soft_prompt_model
+from src.mps.models import SoftPromptModelArguments, load_soft_prompt_model, DeltaModelSentenceTransformer
 import logging
 from transformers import HfArgumentParser
 import os
@@ -31,6 +31,7 @@ class TrainingArugments:
 
 
 def download_dataset(dataset_args: BeirDatasetArguments):
+    
     url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip".format(
         dataset_args.dataset
     )
@@ -39,13 +40,17 @@ def download_dataset(dataset_args: BeirDatasetArguments):
     return data_path
 
 
+#https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip
+
 def train(
     dataset_args: BeirDatasetArguments,
     training_args: TrainingArugments,
     model_args: SoftPromptModelArguments,
 ):
     data_path = download_dataset(dataset_args)
-    model = load_soft_prompt_model(model_args)
+    model, tokenizer= load_soft_prompt_model(model_args)
+    model = DeltaModelSentenceTransformer(modules = [model], tokenizer = tokenizer)
+    retriever = TrainRetriever(model=model, batch_size=training_args.batch_size)
     corpus, queries, qrels = GenericDataLoader(data_path).load(split="train")
     #### Please Note not all datasets contain a dev split, comment out the line if such the case
     dev_corpus, dev_queries, dev_qrels = GenericDataLoader(data_path).load(split="dev")
@@ -61,11 +66,11 @@ def train(
     model_save_path = os.path.join(
         "models",
         "output",
-        "{}-v1-{}".format(model_args.model_name, dataset_args.dataset),
+        "{}-v1-{}".format(model_args.model_name_or_path, dataset_args.dataset),
     )
     os.makedirs(model_save_path, exist_ok=True)
-    retriever = TrainRetriever(model=model, batch_size=training_args.batch_size)
-    evaluation_steps = 100
+    
+    evaluation_steps = 2000
     warmup_steps = int(
         len(train_samples) * training_args.num_epochs / retriever.batch_size * 0.1
     )
@@ -89,7 +94,8 @@ def train(
 
 if __name__ == "__main__":
     logger = logging.getLogger("BEIR_training")
-    dataset_args, training_args, model_args = HfArgumentParser(
-        BeirDatasetArguments, TrainingArugments, SoftPromptModelArguments
+    parser = HfArgumentParser(
+        [BeirDatasetArguments, TrainingArugments, SoftPromptModelArguments]
     )
+    dataset_args, training_args, model_args = parser.parse_args_into_dataclasses()
     train(dataset_args, training_args, model_args)
