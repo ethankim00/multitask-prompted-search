@@ -7,6 +7,7 @@ from tqdm import tqdm, trange
 import torch
 from typing import *
 
+from pathlib import Path
 import os
 
 import logging
@@ -40,25 +41,34 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
             return self._first_module().forward(**kwargs)
         
         
-    def get_soft_token_parameters(self):
-        return list(self._first_module().parameters())[0].detach().numpy()
+    def get_soft_token_parameters(self) -> torch.Tensor:
+        return self.get_submodule(target = '0.soft_prompt_layer').state_dict()["soft_embeds"]
     
-    def load_delta(self):
-        pass
+    def load(self, path: str, **kwargs):
+        if path is None:
+            return
+        embedding_path = Path(path).joinpath("prompt_embeddings.npz")
+        with open(embedding_path, "rb") as f:
+            embeddings = np.load(f)
+        self.get_submodule(target = '0.soft_prompt_layer').load_state_dict({"soft_embeds": torch.tensor(embeddings)})
+        
         
     def save(self, path: str, **kwargs):
         if path is None:
             return
         os.makedirs(path, exist_ok=True)
         # Save base model config
+        # model name
         
         # Save delta model config
+        # number of tokens
+        #
         
-        
-        
-        prompt_embeddings = self.get_soft_token_parameters()
-        # Save embeddings as npz
-        
+        prompt_embeddings = self.get_soft_token_parameters().detach().cpu().numpy()
+        embedding_output_path = Path(path).joinpath("prompt_embeddings.npz")
+        logger.info("Saving Soft Prompt Embeddings")
+        with open(embedding_output_path, "wb") as out:
+            np.save(out, prompt_embeddings)
         
         
 

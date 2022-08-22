@@ -1,6 +1,6 @@
 from .oag_qa import OAGBeirConverter
 
-BEIR_DATASETS = []
+BEIR_DATASETS = ["nfcorpus", "fiqa"]
 OAG_DATASETS = ['deep_learning',
  'real_analysis',
  'functional_analysis',
