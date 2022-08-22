@@ -1,0 +1,1 @@
+from .convert_oagqa_to_beir import OAGBeirConverter

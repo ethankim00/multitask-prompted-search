@@ -1,6 +1,7 @@
 """ Train Models on BEIR datasets using the sentence transformers API"""
 
 from src.mps.models import SoftPromptModelArguments, load_soft_prompt_model, DeltaModelSentenceTransformer
+from src.mps.datasets import OAGBeirConverter, BEIR_DATASETS, OAG_DATASETS
 import logging
 from transformers import HfArgumentParser
 import os
@@ -11,6 +12,7 @@ from beir.retrieval.train import TrainRetriever
 import pathlib, os
 import logging
 
+from pathlib import Path
 logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 
@@ -32,22 +34,28 @@ class TrainingArugments:
 
 def download_dataset(dataset_args: BeirDatasetArguments):
     
-    url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip".format(
-        dataset_args.dataset
-    )
-    out_dir = os.path.join(pathlib.Path("./", dataset_args.data_path))
-    data_path = util.download_and_unzip(url, out_dir)
+    if dataset_args.dataset in BEIR_DATASETS:
+        url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip".format(
+            dataset_args.dataset
+        )
+        out_dir = os.path.join(pathlib.Path("./", dataset_args.data_path))
+        data_path = util.download_and_unzip(url, out_dir)
+    elif dataset_args.dataset in OAG_DATASETS:
+        converter = OAGBeirConverter(data_dir = Path(dataset_args.data_path).joinpath("oag_qa"))
+        data_path = converter.convert(dataset_args.dataset)
+        #data_path = data_joinpath(dataset_args.dataset)
     return data_path
-
-
-#https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip
+        
 
 def train(
     dataset_args: BeirDatasetArguments,
     training_args: TrainingArugments,
     model_args: SoftPromptModelArguments,
 ):
+
     data_path = download_dataset(dataset_args)
+
+    
     model, tokenizer= load_soft_prompt_model(model_args)
     model = DeltaModelSentenceTransformer(modules = [model], tokenizer = tokenizer)
     retriever = TrainRetriever(model=model, batch_size=training_args.batch_size)
