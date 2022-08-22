@@ -7,6 +7,7 @@ from tqdm import tqdm, trange
 import torch
 from typing import *
 
+import os
 
 import logging
 
@@ -37,6 +38,29 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
             }
         else:
             return self._first_module().forward(**kwargs)
+        
+        
+    def get_soft_token_parameters(self):
+        return list(self._first_module().parameters())[0].detach().numpy()
+    
+    def load_delta(self):
+        pass
+        
+    def save(self, path: str, **kwargs):
+        if path is None:
+            return
+        os.makedirs(path, exist_ok=True)
+        # Save base model config
+        
+        # Save delta model config
+        
+        
+        
+        prompt_embeddings = self.get_soft_token_parameters()
+        # Save embeddings as npz
+        
+        
+        
 
     def encode(
         self,
