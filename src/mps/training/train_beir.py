@@ -1,7 +1,7 @@
 """ Train Models on BEIR datasets using the sentence transformers API"""
-
+import json
 from src.mps.models import SoftPromptModelArguments, load_soft_prompt_model, DeltaModelSentenceTransformer
-from src.mps.datasets import OAGBeirConverter, BEIR_DATASETS, OAG_DATASETS
+from src.mps.utils import  download_dataset, BeirDatasetArguments
 import logging
 from transformers import HfArgumentParser
 import os
@@ -14,13 +14,8 @@ import logging
 
 from pathlib import Path
 logger = logging.getLogger(__name__)
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
-
-@dataclass
-class BeirDatasetArguments:
-    dataset: str = field(default=None, metadata={"help": "Beir Dataset to train on"})
-    data_path: str = "./data"
 
 
 @dataclass
@@ -31,20 +26,6 @@ class TrainingArugments:
     loss_function: str = "MNRL"
     num_epochs: int = 1
 
-
-def download_dataset(dataset_args: BeirDatasetArguments):
-    
-    if dataset_args.dataset in BEIR_DATASETS:
-        url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip".format(
-            dataset_args.dataset
-        )
-        out_dir = os.path.join(pathlib.Path("./", dataset_args.data_path))
-        data_path = util.download_and_unzip(url, out_dir)
-    elif dataset_args.dataset in OAG_DATASETS:
-        converter = OAGBeirConverter(data_dir = Path(dataset_args.data_path).joinpath("oag_qa"))
-        data_path = converter.convert(dataset_args.dataset)
-        #data_path = data_joinpath(dataset_args.dataset)
-    return data_path
         
 
 def train(
@@ -54,8 +35,6 @@ def train(
 ):
 
     data_path = download_dataset(dataset_args)
-
-    
     model, tokenizer= load_soft_prompt_model(model_args)
     model = DeltaModelSentenceTransformer(modules = [model], tokenizer = tokenizer)
     retriever = TrainRetriever(model=model, batch_size=training_args.batch_size)
@@ -73,12 +52,12 @@ def train(
     #### Provide model save path
     model_save_path = os.path.join(
         "models",
-        "output",
+        "trained_models",
         "{}-v1-{}".format(model_args.model_name_or_path, dataset_args.dataset),
     )
     os.makedirs(model_save_path, exist_ok=True)
     
-    evaluation_steps = 100
+    evaluation_steps = 1000
     warmup_steps = int(
         len(train_samples) * training_args.num_epochs / retriever.batch_size * 0.1
     )
@@ -98,6 +77,13 @@ def train(
         save_best_model=True,
         use_amp=True,
     )
+    # Write model_info
+    model_params = asdict(training_args)
+    model_params["train_dataset"] = dataset_args.dataset
+    model_params.update(asdict(model_args))
+    with open(Path(model_save_path).joinpath("config.json"), "w") as f:
+        json.dump(model_params, f)
+            
 
 
 if __name__ == "__main__":

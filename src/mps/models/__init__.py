@@ -1,2 +1,3 @@
 from .sentence_transformers_wrapper import DeltaModelSentenceTransformer
 from .prompt_tuning import SoftPromptModelArguments, load_soft_prompt_model
+from .load_models import load_model

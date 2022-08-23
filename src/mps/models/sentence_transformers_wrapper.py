@@ -57,12 +57,9 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         if path is None:
             return
         os.makedirs(path, exist_ok=True)
-        # Save base model config
-        # model name
+        # Save base 
         
-        # Save delta model config
-        # number of tokens
-        #
+     
         
         prompt_embeddings = self.get_soft_token_parameters().detach().cpu().numpy()
         embedding_output_path = Path(path).joinpath("prompt_embeddings.npz")
@@ -178,3 +175,10 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
             all_embeddings = all_embeddings[0]
 
         return all_embeddings
+
+    
+def wrap_soft_prompt_model_sentence_transformer(model_args):
+    model, tokenizer= load_soft_prompt_model(model_args)
+    model = DeltaModelSentenceTransformer(modules = [model], tokenizer = tokenizer)
+    return model
+    
