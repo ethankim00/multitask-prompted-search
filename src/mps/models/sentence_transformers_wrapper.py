@@ -31,14 +31,35 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         )
 
     def forward(self, kwargs, for_train=True):
+        output = self._first_module().forward(**kwargs)
         if for_train:
-            return {
-                "sentence_embedding": self._first_module().forward(**kwargs)[
-                    "pooler_output"
-                ]
-            }
+            if "pooler_output" not in output:
+                embeddings = torch.mean(output[
+                        "last_hidden_state"
+                    ], axis = 1)
+                return {
+                    "sentence_embedding": embeddings
+                }
+            else:
+                return {
+                    "sentence_embedding": output[
+                        "pooler_output"
+                    ]
+                }
         else:
-            return self._first_module().forward(**kwargs)
+            if "pooler_output" not in output:
+                embeddings = torch.mean(outputs[
+                        "last_hidden_state"
+                    ], axis = 1)
+                return {
+                    "sentence_embedding": embeddings
+                }
+            else:
+                return {
+                    "sentence_embedding": output[
+                        "pooler_output"
+                    ]
+                }
         
         
     def get_soft_token_parameters(self) -> torch.Tensor:
@@ -59,6 +80,7 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         os.makedirs(path, exist_ok=True)
         # Save base 
         
+            
      
         
         prompt_embeddings = self.get_soft_token_parameters().detach().cpu().numpy()
@@ -122,14 +144,13 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         all_embeddings = []
         length_sorted_idx = np.argsort([-self._text_length(sen) for sen in sentences])
         sentences_sorted = [sentences[idx] for idx in length_sorted_idx]
-
+        output_value = "sentence_embedding"
         for start_index in trange(
             0, len(sentences), batch_size, desc="Batches", disable=not show_progress_bar
         ):
             sentences_batch = sentences_sorted[start_index : start_index + batch_size]
             features = self.tokenize(sentences_batch)
             features = batch_to_device(features, device)
-
             with torch.no_grad():
                 out_features = self.forward(features, for_train=False)
 
