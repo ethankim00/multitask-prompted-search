@@ -29,7 +29,7 @@ from torch import nn
 from tqdm import trange
 
 @dataclass
-class TrainingArugments:
+class TrainingArguments:
     model_name: str = None
     learning_rate: float = 3e-5
     batch_size: int = 32
@@ -183,8 +183,8 @@ class Trainer:
                 if checkpoint_path is not None and checkpoint_save_steps is not None and checkpoint_save_steps > 0 and global_step % checkpoint_save_steps == 0:
                     model._save_checkpoint(checkpoint_path, checkpoint_save_total_limit, global_step)
 
-
-            model._eval_during_training(evaluator, output_path, save_best_model, epoch, global_step, callback)
+            if epoch % 10 == 0:
+                model._eval_during_training(evaluator, output_path, save_best_model, epoch, global_step, callback)
 
         if evaluator is None and output_path is not None:   #No evaluator, but output path: save final model version
             model.save(output_path)
@@ -193,26 +193,6 @@ class Trainer:
             model._save_checkpoint(checkpoint_path, checkpoint_save_total_limit, global_step)
             
             
-            
-    def _eval_during_training(self, evaluator, output_path, save_best_model, epoch, steps, callback):
-        """Runs evaluation during the training"""
-        # TODO modify to self + model
-        eval_path = output_path
-        if output_path is not None:
-            os.makedirs(output_path, exist_ok=True)
-            eval_path = os.path.join(output_path, "eval")
-            os.makedirs(eval_path, exist_ok=True)
-
-        if evaluator is not None:
-            # TODO return cosim ndcg and @20 and 10
-            # TODO update save best model logci
-            score = evaluator(self, output_path=eval_path, epoch=epoch, steps=steps)
-            if callback is not None:
-                callback(score, epoch, steps)
-            if score > self.best_score:
-                self.best_score = score
-                if save_best_model:
-                    self.save(output_path)
       
     
 def training_callback(score: float, epoch: int, steps: int):
@@ -224,7 +204,7 @@ def training_callback(score: float, epoch: int, steps: int):
 
 def train(
     dataset_args: BeirDatasetArguments,
-    training_args: TrainingArugments,
+    training_args: TrainingArguments,
     model_args: SoftPromptModelArguments,
 ):  
     data_path = download_dataset(dataset_args)
@@ -235,25 +215,23 @@ def train(
         model = SentenceTransformer(model_args.model_name_or_path)
     retriever = TrainRetriever(model=model, batch_size=training_args.batch_size)
     corpus, queries, qrels = GenericDataLoader(data_path).load(split="train")
-    #### Please Note not all datasets contain a dev split, comment out the line if such the case
-    dev_corpus, dev_queries, dev_qrels = GenericDataLoader(data_path).load(split="dev")
+    try:
+        dev_corpus, dev_queries, dev_qrels = GenericDataLoader(data_path).load(split="dev")
+        ir_evaluator = retriever.load_ir_evaluator(dev_corpus, dev_queries, dev_qrels)
+    except:
+        logger.info("No dev set found for evaluation, loading dummy evaluator")
+        ir_evaluator = retriever.load_dummy_evaluator()
     train_samples = retriever.load_train(corpus, queries, qrels)
     train_dataloader = retriever.prepare_train(train_samples, shuffle=True)
     train_loss = losses.MultipleNegativesRankingLoss(model=retriever.model)
-    ir_evaluator = retriever.load_ir_evaluator(dev_corpus, dev_queries, dev_qrels)
-
-    #### If no dev set is present from above use dummy evaluator
-    # ir_evaluator = retriever.load_dummy_evaluator()
-
-    #### Provide model save path
     model_save_path = os.path.join(
         "models",
         "trained_models",
-        "{}-v1-{}".format(model_args.model_name_or_path, dataset_args.dataset),
+        "{}-v1-{}-lr-{}-bs-{}-lf{}-ep-{}-wd-{}".format(model_args.model_name_or_path, dataset_args.dataset, training_args.learning_rate, training_args.batch_size, training_args.loss_function, training_args.num_epochs, training_args.weight_decay),
     )
     os.makedirs(model_save_path, exist_ok=True)
     
-    evaluation_steps = 1000
+    evaluation_steps = 100000
     warmup_steps = int(
         len(train_samples) * training_args.num_epochs / retriever.batch_size * 0.05
     )
@@ -281,7 +259,7 @@ def train(
         callback = callback,
         wandb_log = training_args.wandb_log
     )
-    # Write model_info
+    logger.info("Saving model info")
     model_params = asdict(training_args)
     model_params["train_dataset"] = dataset_args.dataset
     model_params.update(asdict(model_args))
@@ -293,7 +271,7 @@ def train(
 if __name__ == "__main__":
     logger = logging.getLogger("BEIR_training")
     parser = HfArgumentParser(
-        [BeirDatasetArguments, TrainingArugments, SoftPromptModelArguments]
+        [BeirDatasetArguments, TrainingArguments, SoftPromptModelArguments]
     )
     dataset_args, training_args, model_args = parser.parse_args_into_dataclasses()
     
