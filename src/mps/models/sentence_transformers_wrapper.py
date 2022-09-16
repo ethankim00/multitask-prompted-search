@@ -18,6 +18,7 @@ logger = logging.getLogger(name=__name__)
 class DeltaModelSentenceTransformer(SentenceTransformer):
     def __init__(self, modules: list, tokenizer):
         super(DeltaModelSentenceTransformer, self).__init__(modules=modules)
+        self.soft_prompt_token_number = self.get_soft_token_parameters().shape[0]
         self.tokenizer = tokenizer
 
     def tokenize(self, texts: Union[List[str], List[Dict], List[Tuple[str, str]]]):
@@ -32,6 +33,12 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
 
     def forward(self, kwargs, for_train=True):
         output = self._first_module().forward(**kwargs)
+        embeddings = torch.mean(output[
+                        "last_hidden_state"
+                    ][:, :self.soft_prompt_token_number, :], axis = 1)
+        if for_train:
+            embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
+        return {"sentence_embedding": embeddings }
         if for_train:
             if "pooler_output" not in output:
                 embeddings = torch.mean(output[
