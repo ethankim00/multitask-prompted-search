@@ -38,6 +38,7 @@ class TrainingArguments:
     num_epochs: int = 1
     wandb_log: bool = False
     prompt_tune: bool = True
+    gradient_accumulation_steps: int = 1
 
 class Trainer:
     
@@ -63,7 +64,8 @@ class Trainer:
             checkpoint_path: str = None,
             checkpoint_save_steps: int = 500,
             checkpoint_save_total_limit: int = 0,
-            wandb_log: bool = False
+            wandb_log: bool = False,
+            gradient_accumulation_steps: int = 1,
         ):
 
         if use_amp:
@@ -147,12 +149,12 @@ class Trainer:
                             wandb.log({"loss": loss_value.item()}, step = global_step)
                         scale_before_step = scaler.get_scale()
                         scaler.scale(loss_value).backward()
-                        scaler.unscale_(optimizer)
-                        torch.nn.utils.clip_grad_norm_(loss_model.parameters(), max_grad_norm)
-                        scaler.step(optimizer)
-                        scaler.update()
-
-                        skip_scheduler = scaler.get_scale() != scale_before_step
+                        if _ % gradient_accumulation_steps == 0:
+                            scaler.unscale_(optimizer)
+                            torch.nn.utils.clip_grad_norm_(loss_model.parameters(), max_grad_norm)
+                            scaler.step(optimizer)
+                            scaler.update()
+                            skip_scheduler = scaler.get_scale() != scale_before_step
                     else:
                         loss_value = loss_model(features, labels)
                         if wandb_log:
@@ -231,7 +233,7 @@ def train(
     )
     os.makedirs(model_save_path, exist_ok=True)
     
-    evaluation_steps = 100000
+    evaluation_steps = 800
     warmup_steps = int(
         len(train_samples) * training_args.num_epochs / retriever.batch_size * 0.05
     )
@@ -257,7 +259,8 @@ def train(
         save_best_model=True,
         use_amp=True,
         callback = callback,
-        wandb_log = training_args.wandb_log
+        wandb_log = training_args.wandb_log,
+        gradient_accumulation_steps = training_args.gradient_accumulation_steps
     )
     logger.info("Saving model info")
     model_params = asdict(training_args)
