@@ -1,0 +1,4 @@
+wandb
+sentence_transformers
+opendelta
+beir
