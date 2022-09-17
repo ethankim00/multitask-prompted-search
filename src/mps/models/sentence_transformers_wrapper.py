@@ -24,7 +24,7 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
     def tokenize(self, texts: Union[List[str], List[Dict], List[Tuple[str, str]]]):
         return self.tokenizer(
             texts,
-            max_length=256,
+            max_length=200,
             truncation=True,
             padding="max_length",
             return_attention_mask=True,

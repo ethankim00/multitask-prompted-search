@@ -36,7 +36,7 @@ class TrainingArguments:
     loss_function: str = "MNRL"
     weight_decay: float = 0
     num_epochs: int = 1
-    wandb_log: bool = False
+    wandb_log: bool = True
     prompt_tune: bool = True
     gradient_accumulation_steps: int = 1
 
