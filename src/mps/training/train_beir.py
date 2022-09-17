@@ -260,7 +260,11 @@ def train(
         use_amp=True,
         callback = callback,
         wandb_log = training_args.wandb_log,
-        gradient_accumulation_steps = training_args.gradient_accumulation_steps
+        gradient_accumulation_steps = training_args.gradient_accumulation_steps,
+        checkpoint_path = model_save_path,
+        checkpoint_save_steps = 1000,
+        checkpoint_save_total_limit = 50, 
+        
     )
     logger.info("Saving model info")
     model_params = asdict(training_args)
