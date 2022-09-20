@@ -31,7 +31,7 @@ def extract_model_args(cfg: Dict)-> SoftPromptModelArguments:
     
     
 def load_model(model_name_or_path: str) -> Union[SentenceTransformer, DeltaModelSentenceTransformer]:
-    model_path = Path("./models/").joinpath(model_name_or_path)
+    model_path = Path("./models/trained_models").joinpath(model_name_or_path)
     embedding_path = model_path.joinpath("prompt_embeddings.npz")
     if embedding_path.is_file():
         embeddings = np.load(embedding_path)
