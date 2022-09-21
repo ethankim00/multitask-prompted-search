@@ -123,7 +123,10 @@ def evaluate(eval_args: EvaluationArguments):
     )
     data_path = download_dataset(dataset_args)
     corpus, queries, qrels = GenericDataLoader(data_path).load(split=eval_args.split)
-    evaluator = load_ir_evaluator(corpus, queries, qrels, name = eval_args.split)
+    max_corpus_size = None
+    if len(corpus) > int(1e5):
+        max_corpus_size = int(1e5)
+    evaluator = load_ir_evaluator(corpus, queries, qrels, name = eval_args.split, max_corpus_size = max_corpus_size)
     scores = evaluator.compute_metrices(model)
     results = process_ir_retrieval_results(scores, evaluator)
     results.update(asdict(eval_args))
