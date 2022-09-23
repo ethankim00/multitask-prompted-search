@@ -73,7 +73,8 @@ class Trainer:
         wandb_log: bool = False,
         gradient_accumulation_steps: int = 1,
     ):
-
+        if wandb_log:
+            wandb.log({"output_path": output_path})
         if use_amp:
             from torch.cuda.amp import autocast
 
