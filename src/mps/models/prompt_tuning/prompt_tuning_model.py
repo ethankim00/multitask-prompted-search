@@ -48,11 +48,11 @@ def load_soft_prompt_model(model_args: SoftPromptModelArguments):
         tokenizer = AutoTokenizer.from_pretrained(
             model_args.model_name_or_path, cache_dir=model_args.cache_dir
         )
-        soft_prompt_model = SoftPromptModel(
-            backbone_model=base_model,
-            token_init=model_args.init_from_vocab,
-            soft_token_num=model_args.soft_prompt_token_number,
-        )
+    soft_prompt_model = SoftPromptModel(
+        backbone_model=base_model,
+        token_init=model_args.init_from_vocab,
+        soft_token_num=model_args.soft_prompt_token_number,
+    )
     if model_args.freeze_plm:
         soft_prompt_model.freeze_module()
     return base_model, tokenizer

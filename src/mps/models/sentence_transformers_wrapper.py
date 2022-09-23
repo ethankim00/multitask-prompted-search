@@ -11,15 +11,17 @@ from pathlib import Path
 import os
 
 import logging
+import json
 
 logger = logging.getLogger(name=__name__)
 
 
 class DeltaModelSentenceTransformer(SentenceTransformer):
-    def __init__(self, modules: list, tokenizer):
+    def __init__(self, modules: list, tokenizer, config: Dict = None):
         super(DeltaModelSentenceTransformer, self).__init__(modules=modules)
         self.soft_prompt_token_number = self.get_soft_token_parameters().shape[0]
         self.tokenizer = tokenizer
+        self.config = config
 
     def tokenize(self, texts: Union[List[str], List[Dict], List[Tuple[str, str]]]):
         return self.tokenizer(
@@ -33,70 +35,52 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
 
     def forward(self, kwargs, for_train=True):
         output = self._first_module().forward(**kwargs)
-        embeddings = torch.mean(output[
-                        "last_hidden_state"
-                    ][:, :self.soft_prompt_token_number, :], axis = 1)
+        embeddings = torch.mean(
+            output["last_hidden_state"][:, : self.soft_prompt_token_number, :], axis=1
+        )
         if for_train:
             embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-        return {"sentence_embedding": embeddings }
+        return {"sentence_embedding": embeddings}
         if for_train:
             if "pooler_output" not in output:
-                embeddings = torch.mean(output[
-                        "last_hidden_state"
-                    ], axis = 1)
-                return {
-                    "sentence_embedding": embeddings
-                }
+                embeddings = torch.mean(output["last_hidden_state"], axis=1)
+                return {"sentence_embedding": embeddings}
             else:
-                return {
-                    "sentence_embedding": output[
-                        "pooler_output"
-                    ]
-                }
+                return {"sentence_embedding": output["pooler_output"]}
         else:
             if "pooler_output" not in output:
-                embeddings = torch.mean(outputs[
-                        "last_hidden_state"
-                    ], axis = 1)
-                return {
-                    "sentence_embedding": embeddings
-                }
+                embeddings = torch.mean(outputs["last_hidden_state"], axis=1)
+                return {"sentence_embedding": embeddings}
             else:
-                return {
-                    "sentence_embedding": output[
-                        "pooler_output"
-                    ]
-                }
-        
-        
+                return {"sentence_embedding": output["pooler_output"]}
+
     def get_soft_token_parameters(self) -> torch.Tensor:
-        return self.get_submodule(target = '0.soft_prompt_layer').state_dict()["soft_embeds"]
-    
+        return self.get_submodule(target="0.soft_prompt_layer").state_dict()[
+            "soft_embeds"
+        ]
+
     def load(self, path: str, **kwargs):
         if path is None:
             return
         embedding_path = Path(path).joinpath("prompt_embeddings.npz")
         with open(embedding_path, "rb") as f:
             embeddings = np.load(f)
-        self.get_submodule(target = '0.soft_prompt_layer').load_state_dict({"soft_embeds": torch.tensor(embeddings)})
-        
-        
+        self.get_submodule(target="0.soft_prompt_layer").load_state_dict(
+            {"soft_embeds": torch.tensor(embeddings)}
+        )
+
     def save(self, path: str, **kwargs):
         if path is None:
             return
         os.makedirs(path, exist_ok=True)
-        # Save base 
-        
-            
-     
-        
         prompt_embeddings = self.get_soft_token_parameters().detach().cpu().numpy()
         embedding_output_path = Path(path).joinpath("prompt_embeddings.npz")
         logger.info("Saving Soft Prompt Embeddings")
         with open(embedding_output_path, "wb") as out:
             np.save(out, prompt_embeddings)
-        
-        
+        config_path = Path(path).joinpath("config.json")
+        with open(config_path, "w") as f:
+            json.dump(self.config, f)
 
     def encode(
         self,
@@ -204,9 +188,8 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
 
         return all_embeddings
 
-    
+
 def wrap_soft_prompt_model_sentence_transformer(model_args):
-    model, tokenizer= load_soft_prompt_model(model_args)
-    model = DeltaModelSentenceTransformer(modules = [model], tokenizer = tokenizer)
+    model, tokenizer = load_soft_prompt_model(model_args)
+    model = DeltaModelSentenceTransformer(modules=[model], tokenizer=tokenizer)
     return model
-    
