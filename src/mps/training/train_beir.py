@@ -269,37 +269,35 @@ def training_callback(score: float, epoch: int, steps: int):
     )
 
 
-        
-        
 def validate_data_splits(data_path: str):
     data_path = Path(data_path)
     base_path = data_path.joinpath("qrels")
     train_path = base_path.joinpath("train.tsv")
     dev_path = base_path.joinpath("dev.tsv")
     test_path = base_path.joinpath("test.tsv")
-    
+
     paths = [train_path, dev_path, test_path]
-    
+
     if all([path.is_file() for path in paths]):
-        return 
-    
+        return
+
     if test_path.is_file():
         if not any([train_path.is_file(), dev_path.is_file()]):
-            df = pd.read_csv(test_path, delimiter= "\t")
+            df = pd.read_csv(test_path, delimiter="\t")
             print(len(df))
-            train, validate, test = np.split(df.sample(frac=1, random_state=42), [int(.8*len(df)), int(.9*len(df))])
-            train.to_csv(train_path, sep = "\t")
-            validatex.to_csv(dev_path, sep = "\t")
-            test.to_csv(test_path, sep = "\t")
+            train, validate, test = np.split(
+                df.sample(frac=1, random_state=42),
+                [int(0.8 * len(df)), int(0.9 * len(df))],
+            )
+            train.to_csv(train_path, sep="\t", index=False)
+            validate.to_csv(dev_path, sep="\t", index=False)
+            test.to_csv(test_path, sep="\t", index=False)
             return
-        
+
     if not train_path.is_file():
         test_qrels = pd.read_csv(data_path.joinpath("qrels").joinpath("test.tsv"))
-        
-    
-    
-    
-    
+
+
 def train(
     dataset_args: BeirDatasetArguments,
     training_args: TrainingArguments,
@@ -328,7 +326,7 @@ def train(
     model_save_path = os.path.join(
         "models",
         "trained_models",
-        "{}-v1-{}-lr-{}-bs-{}-lf{}-ep-{}-wd-{}-spt-{}-model-{}".format(
+        "{}-v1-{}-lr-{}-bs-{}-lf{}-ep-{}-wd-{}-spt-{}".format(
             model_args.model_name_or_path,
             dataset_args.dataset,
             training_args.learning_rate,
@@ -337,7 +335,6 @@ def train(
             training_args.num_epochs,
             training_args.weight_decay,
             model_args.soft_prompt_token_number,
-            model_args.model_name_or_path,
         ),
     )
     os.makedirs(model_save_path, exist_ok=True)
