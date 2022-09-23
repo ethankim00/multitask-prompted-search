@@ -297,21 +297,18 @@ def train(
     corpus, queries, qrels = GenericDataLoader(data_path).load(split="train")
     max_corpus_size = min(len(corpus), 100000)
     logger.info("Corpus Size: {}".format(max_corpus_size))
-    #try:
-    dev_corpus, dev_queries, dev_qrels = GenericDataLoader(data_path).load(split="dev")
-    ir_evaluator = load_ir_evaluator(dev_corpus, dev_queries, dev_qrels, max_corpus_size = max_corpus_size)
-    #except:
-    #logger.info("No dev set found for evaluation, loading dummy evaluator")
-    #ir_evaluator = retriever.load_dummy_evaluator()
+    try:
+        dev_corpus, dev_queries, dev_qrels = GenericDataLoader(data_path).load(split="dev")
+        ir_evaluator = load_ir_evaluator(dev_corpus, dev_queries, dev_qrels, max_corpus_size = max_corpus_size)
+    except:
+        logger.info("No dev set found for evaluation, loading dummy evaluator")
+        ir_evaluator = retriever.load_dummy_evaluator()
     train_samples = retriever.load_train(corpus, queries, qrels)
     train_dataloader = retriever.prepare_train(train_samples, shuffle=True)
     train_loss = losses.MultipleNegativesRankingLoss(model=retriever.model)
     model_save_path = os.path.join(
         "models",
         "trained_models",
-<<<<<<< HEAD
-        "{}-v1-{}-lr-{}-bs-{}-lf{}-ep-{}-wd-{}".format(model_args.model_name_or_path, dataset_args.dataset, training_args.learning_rate, training_args.batch_size, training_args.loss_function, training_args.num_epochs, training_args.weight_decay),
-=======
         "{}-v1-{}-lr-{}-bs-{}-lf{}-ep-{}-wd-{}-spt-{}".format(
             model_args.model_name_or_path,
             dataset_args.dataset,
@@ -322,7 +319,6 @@ def train(
             training_args.weight_decay,
             model_args.soft_prompt_token_number,
         ),
->>>>>>> 839719cb28f8cfaacfb4a4a2dbd1619635719035
     )
     os.makedirs(model_save_path, exist_ok=True)
     
