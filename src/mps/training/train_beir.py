@@ -1,6 +1,6 @@
 """ Train Models on BEIR datasets using the sentence transformers API"""
-
-
+import numpy as np
+import pandas as pd
 import wandb
 import json
 from src.mps.models import (
@@ -269,6 +269,37 @@ def training_callback(score: float, epoch: int, steps: int):
     )
 
 
+        
+        
+def validate_data_splits(data_path: str):
+    data_path = Path(data_path)
+    base_path = data_path.joinpath("qrels")
+    train_path = base_path.joinpath("train.tsv")
+    dev_path = base_path.joinpath("dev.tsv")
+    test_path = base_path.joinpath("test.tsv")
+    
+    paths = [train_path, dev_path, test_path]
+    
+    if all([path.is_file() for path in paths]):
+        return 
+    
+    if test_path.is_file():
+        if not any([train_path.is_file(), dev_path.is_file()]):
+            df = pd.read_csv(test_path, delimiter= "\t")
+            print(len(df))
+            train, validate, test = np.split(df.sample(frac=1, random_state=42), [int(.8*len(df)), int(.9*len(df))])
+            train.to_csv(train_path, sep = "\t")
+            validatex.to_csv(dev_path, sep = "\t")
+            test.to_csv(test_path, sep = "\t")
+            return
+        
+    if not train_path.is_file():
+        test_qrels = pd.read_csv(data_path.joinpath("qrels").joinpath("test.tsv"))
+        
+    
+    
+    
+    
 def train(
     dataset_args: BeirDatasetArguments,
     training_args: TrainingArguments,
@@ -281,6 +312,7 @@ def train(
     else:
         model = SentenceTransformer(model_args.model_name_or_path)
     retriever = TrainRetriever(model=model, batch_size=training_args.batch_size)
+    validate_data_splits(data_path)
     corpus, queries, qrels = GenericDataLoader(data_path).load(split="train")
     try:
         dev_corpus, dev_queries, dev_qrels = GenericDataLoader(data_path).load(

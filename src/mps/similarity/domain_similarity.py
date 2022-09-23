@@ -3,6 +3,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from itertools import combinations
 from sklearn.metrics.pairwise import cosine_similarity
+from abc import ABC
 
 
 class DomainFeatureExtractor(ABC):
@@ -17,7 +18,7 @@ class SoftPromptEmbeddingFeatureExtractor(DomainFeatureExtractor):
 
 class UnsupervisedDomainFeatureExtractor(DomainFeatureExtractor):
     def __init__(
-        self, encoder_model: str = "all-minilm-v2", data_dir: str = "./data/beir"
+        self, encoder_model: str = "all-MiniLM-L6-v2", data_dir: str = "./data/beir"
     ):
 
         self.encoder_model = SentenceTransformer(encoder_model)
@@ -71,7 +72,7 @@ class DomainSimilarity:
 
     def calculate_pairwise_similarities(
         self,
-        embeddings: Dict[str : np.ndarray],
+        embeddings: Dict,
     ) -> np.ndarray:
         for pair in combinations(list(embeddings.keys()), 2):
             similarity = self._calculate_similarities(pair, embeddings)
@@ -87,7 +88,7 @@ class DomainSimilarity:
 
     def return_most_similar_domains(
         self, domain: str, k: int = 5
-    ) -> List[Tuple(str, float)]:
+    ) -> List[Tuple[str, float]]:
         pass
 
 
