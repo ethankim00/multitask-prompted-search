@@ -38,8 +38,8 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         embeddings = torch.mean(
             output["last_hidden_state"][:, : self.soft_prompt_token_number, :], axis=1
         )
-        if for_train:
-            embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
+        #if for_train:
+            #embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
         return {"sentence_embedding": embeddings}
         if for_train:
             if "pooler_output" not in output:
