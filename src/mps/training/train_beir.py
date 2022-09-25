@@ -277,10 +277,6 @@ def load_ir_evaluator( corpus: Dict[str, Dict[str, str]], queries: Dict[str, str
     
     
     
-=======
-
-
->>>>>>> 839719cb28f8cfaacfb4a4a2dbd1619635719035
 def train(
     dataset_args: BeirDatasetArguments,
     training_args: TrainingArguments,
