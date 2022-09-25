@@ -222,6 +222,7 @@ def validate_data_splits(data_path: str):
 
     if test_path.is_file():
         if not any([train_path.is_file(), dev_path.is_file()]):
+            logger.info("Creating training and validation splits from test dataset")
             df = pd.read_csv(test_path, delimiter="\t")
             train, validate, test = np.split(df.sample(frac=1, random_state=42), [int(.8*len(df)), int(.9*len(df))])
             train.to_csv(train_path, sep = "\t", index = False)
@@ -229,8 +230,25 @@ def validate_data_splits(data_path: str):
             test.to_csv(test_path, sep = "\t", index = False)
             return
 
-    if not train_path.is_file():
-        test_qrels = pd.read_csv(data_path.joinpath("qrels").joinpath("test.tsv"))
+        if train_path.is_file() and not dev_path.is_file():
+            logger.info("Creating validation split from train dataset")
+            df = pd.read_csv(data_path.joinpath("qrels").joinpath("train.tsv"), delimiter="\t")
+            train, validate = np.split(df.sample(frac=1, random_state=42), [int(.8*len(df))])
+            train.to_csv(train_path, sep = "\t", index = False)
+            validate.to_csv(dev_path, sep = "\t", index = False)
+            return 
+            
+        if not train_path.is_file() and dev_path.is_file():
+            logger.info("Creating training split from test and dev datasets")
+            test_df = pd.read_csv(data_path.joinpath("qrels").joinpath("test.tsv"), delimiter="\t")
+            val_df = pd.read_csv(data_path.joinpath("qrels").joinpath("dev.tsv"), delimiter="\t")
+            df = pd.concat([test_df, val_df])
+            train, validate, test = np.split(df.sample(frac=1, random_state=42), [int(.8*len(df)), int(.9*len(df))])
+            train.to_csv(train_path, sep = "\t", index = False)
+            validate.to_csv(dev_path, sep = "\t", index = False)
+            test.to_csv(test_path, sep = "\t", index = False)
+            return 
+        
         
     
 def load_ir_evaluator( corpus: Dict[str, Dict[str, str]], queries: Dict[str, str], 
