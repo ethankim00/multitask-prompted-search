@@ -3,6 +3,7 @@ from .prompt_tuning import SoftPromptModelArguments, load_soft_prompt_model
 from .utils import HFModelArguments
 from pathlib import Path
 
+from dataclasses import asdict
 import json
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -42,7 +43,7 @@ def load_model(
         model_args = extract_model_args(config)
         model = wrap_soft_prompt_model_sentence_transformer(model_args)
         model.load(model_path)
-        model.config = model_args.to_dict()
+        model.config = asdict(model_args)
     else:
         model = SentenceTransformer(model_name_or_path)
     return model
