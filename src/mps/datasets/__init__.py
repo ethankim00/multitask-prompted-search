@@ -1,6 +1,6 @@
 from .oag_qa import OAGBeirConverter
 
-BEIR_DATASETS = ["nfcorpus", "fiqa", "trec-covid", "fever", "hotpotqa", "nq", "msmarco", "arguana", "webis-touche2020", "cqadupstack", "quora", "dbpedia-entity","scidocs", "scifact"]
+BEIR_DATASETS = ["nfcorpus", "fiqa", "trec-covid", "fever", "hotpotqa", "nq", "msmarco", "arguana", "webis-touche2020", "cqadupstack", "quora", "dbpedia-entity","scidocs", "scifact", "climate-fever"]
 
 
 OAG_DATASETS = ['deep_learning',
