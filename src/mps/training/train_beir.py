@@ -336,7 +336,7 @@ def train(
     )
     os.makedirs(model_save_path, exist_ok=True)
     
-    evaluation_steps = 800
+    evaluation_steps = 10000
     warmup_steps = int(
         len(train_samples) * training_args.num_epochs / retriever.batch_size * 0.05
     )
