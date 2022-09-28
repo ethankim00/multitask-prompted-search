@@ -92,6 +92,9 @@ OAG_DATASETS = ['deep_learning',
  'quantum_information']
 
 
+DATASET_GROUPS = {"beir": BEIR_DATASETS. "oag": OAG_DATASETS}
+
+
 TOP_LEVEL_OAG_DATASETS = {'GEOMETRY': [ 'geometry','algebraic_geometry','algebraic_topology','differential_geometry',
 'group_theory','category','topology'],
 
