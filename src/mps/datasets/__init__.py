@@ -20,6 +20,8 @@ BEIR_DATASETS = [
 
 FULL_BEIR_DATASETS = BEIR_DATASETS + ["signal1m", "trec-news", "robust04", "bioasq"]
 
+CQA_DATASETS = ["android", "english",  "gaming",  "gis",   "mathematica",  "physics", "programmers", "stats", "tex",  "unix", "webmasters", "wordpress"]
+
 OAG_DATASETS = [
     "deep_learning",
     "real_analysis",
