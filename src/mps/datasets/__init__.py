@@ -20,7 +20,20 @@ BEIR_DATASETS = [
 
 FULL_BEIR_DATASETS = BEIR_DATASETS + ["signal1m", "trec-news", "robust04", "bioasq"]
 
-CQA_DATASETS = ["android", "english",  "gaming",  "gis",   "mathematica",  "physics", "programmers", "stats", "tex",  "unix", "webmasters", "wordpress"]
+CQA_DATASETS = [
+    "android",
+    "english",
+    "gaming",
+    "gis",
+    "mathematica",
+    "physics",
+    "programmers",
+    "stats",
+    "tex",
+    "unix",
+    "webmasters",
+    "wordpress",
+]
 
 OAG_DATASETS = [
     "deep_learning",
@@ -115,8 +128,10 @@ OAG_DATASETS = [
 
 DATASET_GROUPS = {
     "beir": BEIR_DATASETS,
+    "cqa": CQA_DATASETS,
     "oag": OAG_DATASETS,
     "beir_full": FULL_BEIR_DATASETS,
+    "beir_expand": BEIR_DATASETS.remove("cqadupstack") + CQA_DATASETS,
 }
 
 
