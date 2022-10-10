@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
         wandb.init(
             project="prompt_tuning_information_retrieval",
-            entity="ethankim10",
+            entity="ir-transfer",
             tags=["eval"],
         )
         wandb_logging = True

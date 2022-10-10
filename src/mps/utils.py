@@ -28,7 +28,7 @@ def download_dataset(dataset_args: BeirDatasetArguments) -> str:
         url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/cqadupstack.zip"
         out_dir = os.path.join(Path("./", dataset_args.data_dir))
         data_dir = util.download_and_unzip(url, out_dir)
-        data_dir = data_dir + dataset_args.dataset
+        data_dir = data_dir + "/" + dataset_args.dataset
     # elif dataset_args.dataset in TOP_LEVEL_OAG:
     #     s    pass
     # TODO logic for top level oag topics

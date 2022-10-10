@@ -18,6 +18,24 @@ BEIR_DATASETS = [
     "scifact",
 ]
 
+BEIR_DATASETS_WO_CQA = [
+    "msmarco",
+    "trec-covid",
+    "nfcorpus",
+    "nq",
+    "hotpotqa",
+    "fiqa",
+    "arguana",
+    "webis-touche2020",
+    "quora",
+    "dbpedia-entity",
+    "scidocs",
+    "fever",
+    "climate-fever",
+    "scifact",
+]
+
+
 FULL_BEIR_DATASETS = BEIR_DATASETS + ["signal1m", "trec-news", "robust04", "bioasq"]
 
 CQA_DATASETS = [
@@ -126,14 +144,6 @@ OAG_DATASETS = [
 ]
 
 
-DATASET_GROUPS = {
-    "beir": BEIR_DATASETS,
-    "cqa": CQA_DATASETS,
-    "oag": OAG_DATASETS,
-    "beir_full": FULL_BEIR_DATASETS,
-    "beir_expand": BEIR_DATASETS.remove("cqadupstack") + CQA_DATASETS,
-}
-
 
 TOP_LEVEL_OAG_DATASETS = {
     "GEOMETRY": [
@@ -228,4 +238,16 @@ TOP_LEVEL_OAG_DATASETS = {
     ],
     "NLP": ["natural_language_processing", "recurrent_neural_network"],
     "ECONOMICS": ["economics"],
+}
+
+
+
+
+DATASET_GROUPS = {
+    "beir": BEIR_DATASETS,
+    "cqa": CQA_DATASETS,
+    "oag": OAG_DATASETS,
+    "oag_top_level": TOP_LEVEL_OAG_DATASETS.keys(),
+    "beir_full": FULL_BEIR_DATASETS,
+    "beir_expand": BEIR_DATASETS_WO_CQA + CQA_DATASETS,
 }

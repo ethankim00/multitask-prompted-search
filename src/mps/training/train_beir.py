@@ -188,6 +188,14 @@ class Trainer:
                 if checkpoint_path is not None and checkpoint_save_steps is not None and checkpoint_save_steps > 0 and global_step % checkpoint_save_steps == 0:
                     model._save_checkpoint(checkpoint_path, checkpoint_save_total_limit, global_step)
 
+            if wandb_log:
+                # log samples
+                table = wandb.Table(columns=["soft_prompt_nns"])
+                soft_prompt_token_nearest_neighbors = model.get_top_similar_vocab_words()
+                for neighbor in soft_prompt_token_nearest_neighbors:
+                    table.add(str(neighbor))
+                wandb.log({"vocab": table})
+
             if epoch % 10 ==0:
                 logger.info("Evaluating")
                 model._eval_during_training(evaluator, output_path, save_best_model, epoch, global_step, callback)
@@ -307,6 +315,7 @@ def train(
     else:
         model = SentenceTransformer(model_args.model_name_or_path)
     retriever = TrainRetriever(model=model, batch_size=training_args.batch_size)
+    logger.info("Data Path: {}".format(data_path))
     validate_data_splits(data_path)
     corpus, queries, qrels = GenericDataLoader(data_path).load(split="train")
     max_corpus_size = min(len(corpus), 100000)
@@ -387,7 +396,7 @@ if __name__ == "__main__":
     
     if training_args.wandb_log:
         import wandb
-        wandb.init(project="prompt_tuning_information_retrieval", entity="ethankim10", tags=["train"])
+        wandb.init(project="prompt_tuning_information_retrieval", entity="ir-transfer", tags=["train"])
         wandb_logging = True
         model_params = asdict(training_args)
         model_params["train_dataset"] = dataset_args.dataset
