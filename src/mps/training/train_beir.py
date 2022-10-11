@@ -70,7 +70,6 @@ class Trainer:
             wandb_log: bool = False,
             gradient_accumulation_steps: int = 1,
         ):
-
         if use_amp:
             from torch.cuda.amp import autocast
             scaler = torch.cuda.amp.GradScaler()
