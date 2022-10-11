@@ -9,7 +9,7 @@ from typing import *
 
 from pathlib import Path
 import os
-
+from sklearn.metrics.pairwise import cosine_similarity
 import logging
 import json
 
@@ -58,6 +58,13 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         return self.get_submodule(target="0.soft_prompt_layer").state_dict()[
             "soft_embeds"
         ]
+    
+    def get_top_similar_vocab_words(self, top_k: int = 10) -> List[str]:
+        word_embeddings = list(self.modules())[2].state_dict()["word_embeddings.weight"].detach().numpy()
+        prompt_embeddings = self.get_soft_token_parameters().detach().numpy()
+        similarities = cosine_similarity(word_embeddings, prompt_embeddings)
+        top = np.argsort(similarities, axis = 0)[-top_k:, :]
+        return self.tokenizer.batch_decode(top)
 
     def load(self, path: str, **kwargs):
         if path is None:
@@ -81,6 +88,9 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         config_path = Path(path).joinpath("config.json")
         with open(config_path, "w") as f:
             json.dump(self.config, f)
+        if kwargs.get("wandb_log", False):
+            import wandb
+            wandb.save(self.get_soft_token_parameters())
 
     def encode(
         self,
