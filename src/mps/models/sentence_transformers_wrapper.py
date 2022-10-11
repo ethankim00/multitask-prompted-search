@@ -60,11 +60,11 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         ]
     
     def get_top_similar_vocab_words(self, top_k: int = 10) -> List[str]:
-        word_embeddings = list(self.modules())[2].state_dict()["word_embeddings.weight"].detach().numpy()
-        prompt_embeddings = self.get_soft_token_parameters().detach().numpy()
+        word_embeddings = list(self.modules())[2].state_dict()["word_embeddings.weight"].detach().cpu().numpy()
+        prompt_embeddings = self.get_soft_token_parameters().detach().cpu().numpy()
         similarities = cosine_similarity(word_embeddings, prompt_embeddings)
         top = np.argsort(similarities, axis = 0)[-top_k:, :]
-        return self.tokenizer.batch_decode(top)
+        return self.tokenizer.batch_decode(top.T)
 
     def load(self, path: str, **kwargs):
         if path is None:
@@ -89,6 +89,7 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         with open(config_path, "w") as f:
             json.dump(self.config, f)
         if kwargs.get("wandb_log", False):
+            logger.info("Uploading model embeddings to wandb")
             import wandb
             wandb.save(self.get_soft_token_parameters())
 

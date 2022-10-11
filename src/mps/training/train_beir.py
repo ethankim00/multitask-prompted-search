@@ -188,20 +188,19 @@ class Trainer:
                 if checkpoint_path is not None and checkpoint_save_steps is not None and checkpoint_save_steps > 0 and global_step % checkpoint_save_steps == 0:
                     model._save_checkpoint(checkpoint_path, checkpoint_save_total_limit, global_step)
 
-            if wandb_log:
-                # log samples
-                table = wandb.Table(columns=["soft_prompt_nns"])
-                soft_prompt_token_nearest_neighbors = model.get_top_similar_vocab_words()
-                for neighbor in soft_prompt_token_nearest_neighbors:
-                    table.add(str(neighbor))
-                wandb.log({"vocab": table})
-
             if epoch % 10 ==0:
                 logger.info("Evaluating")
                 model._eval_during_training(evaluator, output_path, save_best_model, epoch, global_step, callback)
 
-        if evaluator is None and output_path is not None:   #No evaluator, but output path: save final model version
-            model.save(output_path)
+            if wandb_log:
+                table = wandb.Table(columns=["soft_prompt_token_nearest_neighbors"])
+                soft_prompt_token_nearest_neighbors  = model.get_top_similar_vocab_words()
+                for neighbor in soft_prompt_token_nearest_neighbors:
+                    table.add_data(str(neighbor))
+                wandb.log({"soft_prompt_token_nns": table})
+
+        if evaluator is None and output_path is not None:
+            model.save(output_path, wandb_log = wandb_log)
 
         if checkpoint_path is not None:
             model._save_checkpoint(checkpoint_path, checkpoint_save_total_limit, global_step)
