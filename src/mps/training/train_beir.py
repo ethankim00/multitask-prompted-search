@@ -37,7 +37,7 @@ class TrainingArguments:
     learning_rate: float = 3e-5
     batch_size: int = 32
     loss_function: str = "MNRL"
-    weight_decay: float = 0
+    weight_decay: float = 0.0
     num_epochs: int = 1
     wandb_log: bool = True
     prompt_tune: bool = True
@@ -187,9 +187,10 @@ class Trainer:
                 if checkpoint_path is not None and checkpoint_save_steps is not None and checkpoint_save_steps > 0 and global_step % checkpoint_save_steps == 0:
                     model._save_checkpoint(checkpoint_path, checkpoint_save_total_limit, global_step)
 
-            if epoch % 10 ==0:
+            if (epoch % 10 ==0) or (epoch ==epochs -1):
                 logger.info("Evaluating")
                 model._eval_during_training(evaluator, output_path, save_best_model, epoch, global_step, callback)
+                model._save_checkpoint(checkpoint_path, checkpoint_save_total_limit, global_step)
 
             if wandb_log:
                 table = wandb.Table(columns=["soft_prompt_token_nearest_neighbors"])
@@ -394,7 +395,7 @@ if __name__ == "__main__":
     
     if training_args.wandb_log:
         import wandb
-        wandb.init(project="prompt_tuning_information_retrieval", entity="ir-transfer", tags=["train"])
+        wandb.init(project="prompt_tuning_information_retrieval", entity="ir-transfer", tags=["train", "beir_expand"])
         wandb_logging = True
         model_params = asdict(training_args)
         model_params["train_dataset"] = dataset_args.dataset
