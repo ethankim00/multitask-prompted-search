@@ -1,3 +1,4 @@
+from gevent import config
 from torch.nn.functional import softmax
 import torch
 from dataclasses import dataclass, field
@@ -8,6 +9,8 @@ from src.mps.eval.eval_beir import evaluate, EvaluationArguments
 from src.mps.datasets import DATASET_GROUPS
 
 import numpy as np
+
+import json
 from typing import Dict
 
 field(
@@ -53,7 +56,7 @@ class TransferEvaluationArguments:
     source_model_path: str = field(
         default="./models",
         metadata={
-            "help": "path to folder with set of trained models, or path to set of wandb model training runs"
+            "help": "path to folder with set of trained models, or tag to set of wandb model training runs"
         },
     )
 
@@ -82,6 +85,12 @@ def get_weighted_prompts(
     return transfer_embeddings
 
 
+
+def load_wandb_runs(source_datasets: List[str], tag: str) -> pd.DataFrame:
+
+    runs = 
+
+
 def eval_transfer(eval_args: TransferEvaluationArguments):
 
     source_datasets = DATASET_GROUPS[eval_args.source_dataset_group]
@@ -92,15 +101,17 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     # 2. Load artifacts from wandb api
     if eval_args.load_from_wandb:
 
+        wandb_runs = load_wandb_runs(source_datasets, eval_args.source_model_path)
         for dataset in source_datasets:
-            run_path = eval_args.sour
+            run_id = wandb_runs.loc[wandb_runs["dataset"] == dataset] 
         a = wandb.restore(
             "prompt_embeddings.npz",
-            run_path="ir-transfer/prompt_tuning_information_retrieval/1u0z6gtm",
-            root="./models",
+            run_path="ir-transfer/prompt_tuning_information_retrieval/{}".format(run_id),
+            root="./models" + "/" + dataset
         )
 
-        pass
+    else:
+
 
     ## Calculate Similarities
     embeddings_dict = None
@@ -112,11 +123,27 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     weights = get_weights(scores, temperature=eval_args.temperature)
     prompt_embeddings = get_weighted_prompts(weights, embeddings_dict)
 
-    # Calculate embeddings with weights
+    # TODO add path from argument
+    output_dir = Path(
+        eval_args.source_dataset_group
+        + eval_args.similarity_method
+        + eval_args.target_dataset
+        + eval_args.temperature
+        + eval_args.top_k
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    embedding_output_path = output_dir.joinpath("prompt_embeddings.npz")
 
-    ## Save model allong with config:
-
+    config_dict = asdict(eval_args)
+    config_output_path = output_dir.joinpath("config.json")
+    json.dump(config_dict, config_output_path)
+    np.save(open(embedding_output_path, "wb"))
     ## cal eval on this new model
+
+    eval_script_args = EvaluationArguments(
+        model_name_or_path=output_dir, dataset=eval_args.target_dataset, split="test"
+    )
+    evaluate(eval_script_args)
 
 
 if __name__ == "__main__":
