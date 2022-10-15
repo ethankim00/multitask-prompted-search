@@ -88,10 +88,12 @@ class DeltaModelSentenceTransformer(SentenceTransformer):
         config_path = Path(path).joinpath("config.json")
         with open(config_path, "w") as f:
             json.dump(self.config, f)
-        if kwargs.get("wandb_log", False):
-            logger.info("Uploading model embeddings to wandb")
-            import wandb
-            wandb.save(self.get_soft_token_parameters())
+        # if kwargs.get("wandb_log", False):
+        with open("./prompt_embeddings.npz", "wb") as out:
+             np.save(out, prompt_embeddings)
+        logger.info("Uploading model embeddings to wandb")
+        import wandb
+        wandb.save("./prompt_embeddings.npz", base_path = "./")
 
     def encode(
         self,
