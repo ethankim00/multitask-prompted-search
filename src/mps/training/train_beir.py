@@ -119,6 +119,7 @@ class Trainer:
 
         skip_scheduler = False
         for epoch in trange(epochs, desc="Epoch", disable=not show_progress_bar):
+            logger.info("Epoch: {}".format(epoch))
             training_steps = 0
 
             for loss_model in loss_models:
@@ -225,6 +226,11 @@ def validate_data_splits(data_path: str):
     paths = [train_path, dev_path, test_path]
 
     if all([path.is_file() for path in paths]):
+        train_df = pd.read_csv(train_path, delimiter = "\t")
+        if len(train_df) > 10000: # limit to 10000 training examples
+            logger.info("Limiting Train Dataset")
+            train_df = train_df[0:10000]
+            train_df.to_csv(train_path, sep = "\t", index = False)
         return
 
     if test_path.is_file():
