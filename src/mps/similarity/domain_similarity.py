@@ -7,6 +7,9 @@ from abc import ABC
 import json
 from pathlib import Path
 
+
+from src.mps.datasets import CQA_DATASETS
+
 class DomainFeatureExtractor(ABC):
     def extract_features():
         raise NotImplementedError
@@ -43,7 +46,8 @@ class UnsupervisedDomainFeatureExtractor(DomainFeatureExtractor):
 
 
     def _load_documents(self, domain: str, file_name: str, num: int = 100) -> Iterable[str]:
-
+        if domain in CQA_DATASETS:
+            domain = "cqadupstack" + "/" + domain
         folder_path = Path(self.data_dir).joinpath(domain)
         document_path = folder_path.joinpath(file_name)
         document_list = []
