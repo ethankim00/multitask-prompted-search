@@ -124,7 +124,7 @@ def process_ir_retrieval_results(scores: Dict, evaluator) -> Dict[str, float]:
     return {k: v for k, v in zip(keys, values)}
 
 
-def evaluate(eval_args: EvaluationArguments):
+def evaluate(eval_args: EvaluationArguments, wandb_logging: bool = False):
     logger.info(
         "Evaluating Model {} on dataset {} with split {}".format(
             eval_args.model_name_or_path, eval_args.dataset, eval_args.split
@@ -149,9 +149,8 @@ def evaluate(eval_args: EvaluationArguments):
     results.update(asdict(eval_args))
     logger.info("Results")
     if wandb_logging:
+        import wandb
         wandb.log(results)
-    print(results)
-
 
 if __name__ == "__main__":
 
@@ -169,4 +168,4 @@ if __name__ == "__main__":
 
     parser = HfArgumentParser(EvaluationArguments)
     eval_args = parser.parse_args_into_dataclasses()[0]
-    evaluate(eval_args)
+    evaluate(eval_args, wandb_logging = wandb_logging)
