@@ -14,7 +14,7 @@ from typing import Dict
 
 from pathlib import Path
 
-
+from src.mps.utils import download_dataset, BeirDatasetArguments
 
 import pandas as pd
 import wandb
@@ -107,6 +107,11 @@ def eval_transfer(eval_args: TransferEvaluationArguments, wandb_logging: bool = 
     source_datasets = DATASET_GROUPS[eval_args.source_dataset_group]
     runs = api.runs("ir-transfer/prompt_tuning_information_retrieval")
     source_datatsets = [run.config["train_dataset"] for run in runs if eval_args.source_dataset_group in run.tags]
+    for dataset in source_datasets:
+        dataset_args = BeirDatasetArguments(
+        dataset=dataset, data_dir="./data"
+        )
+    data_path = download_dataset(dataset_args)
     logger.info("Using {} source datasets from {}".format(len(source_datasets), eval_args.source_dataset_group))
     logger.info("Base Model is {}".format(eval_args.model_name_or_path))
     logger.info("Determining Domain Similarity with {} top k {} and temperature {}".format(eval_args.similarity_method, eval_args.top_k, eval_args.temperature))
@@ -119,6 +124,8 @@ def eval_transfer(eval_args: TransferEvaluationArguments, wandb_logging: bool = 
     )
     scores = domain_similarity.return_domain_similarities(eval_args.target_dataset, k = eval_args.top_k)
     weights = get_weights(scores, temperature=eval_args.temperature)
+    if wandb_logging:
+        wandb.log({"weights": weights})
     prompt_embeddings = get_weighted_prompts(weights, embedding_dict)
     output_dir = Path("./models/trained_models").joinpath(
         eval_args.source_dataset_group
