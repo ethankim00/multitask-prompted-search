@@ -25,7 +25,7 @@ class SoftPromptModelArguments(HFModelArguments):
     """
 
     soft_prompt_token_number: int = field(
-        default=20, metadata={"help": "Number of soft prompt embeddings to train"}
+        default=40, metadata={"help": "Number of soft prompt embeddings to train"}
     )
 
     init_from_vocab: bool = field(
