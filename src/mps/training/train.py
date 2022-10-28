@@ -16,6 +16,7 @@ from openmatch.trainer import GCDenseTrainer
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
 #from transformers.integrations import TensorBoardCallback
 from torch import Tensor
+import torch.nn.functional as F
 import torch
 
 from opendelta import SoftPromptModel
@@ -29,7 +30,7 @@ from dataclasses import dataclass
 class PromptModelArguments(ModelArguments):
     soft_prompt_token_number: int = 40
     init_from_vocab: bool = True
-    freeze_plm : bool = True
+    freeze_plm : bool = False
     
 from transformers.modeling_outputs import ModelOutput
 @dataclass
@@ -71,15 +72,12 @@ class PromptDRModel(DRModel):
             if self.train_args.negatives_x_device
             else self.train_args.per_device_train_batch_size
         )
-
         scores = torch.matmul(q_reps, p_reps.transpose(0, 1))
-
         target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
         target = target * self.data_args.train_n_passages
-
+        print(self.loss_fn)
         loss = self.loss_fn(scores, target)
         loss.backward()
-        print("losose")
 
         if self.training and self.train_args.negatives_x_device:
             loss = loss * self.world_size  # counter average weight reduction
@@ -101,11 +99,10 @@ class PromptDRModel(DRModel):
         else:
             items_out = model(**items, return_dict=True)
             hidden = getattr(items_out, self.feature)
+            print(hidden.shape)
             if self.pooling == "first":
                 reps = hidden[:, 0, :]
             elif self.pooling == "mean":
-                print("pooling")
-                print(items.attention_mask)
                 soft_prompt_attention_mask = items.attention_mask
                 soft_prompt_attention_mask[:, :model.soft_prompt_token_number] = torch.zeros((items.attention_mask.shape[0], model.soft_prompt_token_number))
                 reps = mean_pooling(hidden, soft_prompt_attention_mask) # only pool hidden reps of real tokens
@@ -117,7 +114,6 @@ class PromptDRModel(DRModel):
             reps = head(reps)  # D * d
         if self.normalize:
             reps = F.normalize(reps, dim=1)
-        print(reps.shape)
         return hidden, reps
     
 
