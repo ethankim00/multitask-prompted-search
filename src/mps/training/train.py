@@ -5,6 +5,7 @@ import os
 import sys
 
 from transformers import BatchEncoding
+import json
 
 from openmatch.arguments import DataArguments
 from openmatch.arguments import DRTrainingArguments as TrainingArguments
@@ -49,39 +50,23 @@ def mean_pooling(token_embeddings, attention_mask):
     
     
 class PromptDRModel(DRModel):
-    
-    
-    def forward(
-        self,
-        query: Dict[str, Tensor] = None,
-        passage: Dict[str, Tensor] = None,
-    ):
-        q_hidden, q_reps = self.encode_query(query)
-        p_hidden, p_reps = self.encode_passage(passage)
-
-        if q_reps is None or p_reps is None:
-            return DROutput(q_reps=q_reps, p_reps=p_reps)
-
-        # if self.training:
-        if self.train_args.negatives_x_device:
-            q_reps = self.dist_gather_tensor(q_reps)
-            p_reps = self.dist_gather_tensor(p_reps)
-
-        effective_bsz = (
-            self.train_args.per_device_train_batch_size * self.world_size
-            if self.train_args.negatives_x_device
-            else self.train_args.per_device_train_batch_size
-        )
-        scores = torch.matmul(q_reps, p_reps.transpose(0, 1))
-        target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
-        target = target * self.data_args.train_n_passages
-        print(self.loss_fn)
-        loss = self.loss_fn(scores, target)
-        loss.backward()
-
-        if self.training and self.train_args.negatives_x_device:
-            loss = loss * self.world_size  # counter average weight reduction
-        return DROutput(loss=loss, scores=scores, q_reps=q_reps, p_reps=p_reps)
+  
+ 
+    def save(self, output_dir: str):
+        if not self.tied:
+            os.makedirs(os.path.join(output_dir, "query_model"))
+            os.makedirs(os.path.join(output_dir, "passage_model"))
+            torch.save(self.lm_q.state_dict(), os.path.join(output_dir, "query_model", "model.ckpt"))
+            torch.save(self.lm_p.state_dict(), os.path.join(output_dir, "passage_model", "model.ckpt"))
+            if self.head_q is not None:
+                self.head_q.save(os.path.join(output_dir, "query_head"))
+                self.head_p.save(os.path.join(output_dir, "passage_head"))
+        else:
+            torch.save(self.lm_q.state_dict(), os.path.join(output_dir, "model.ckpt"))
+            if self.head_q is not None:
+                self.head_q.save(output_dir)
+        with open(os.path.join(output_dir, "openmatch_config.json"), "w") as f:
+            json.dump(self._get_config_dict(), f, indent=4)
     
     def encode(self, items, model, head):
         if items is None:
@@ -99,7 +84,6 @@ class PromptDRModel(DRModel):
         else:
             items_out = model(**items, return_dict=True)
             hidden = getattr(items_out, self.feature)
-            print(hidden.shape)
             if self.pooling == "first":
                 reps = hidden[:, 0, :]
             elif self.pooling == "mean":
@@ -115,6 +99,8 @@ class PromptDRModel(DRModel):
         if self.normalize:
             reps = F.normalize(reps, dim=1)
         return hidden, reps
+    
+
     
 
 
@@ -192,13 +178,10 @@ def train():
             delta_model.freeze_module(exclude=["deltas"], set_state_dict=True)
     else:
         model.lm_p = model.lm_q
-        print(model.lm_p)
     TrainDatasetClass = MappingDRTrainDataset if training_args.use_mapping_dataset else StreamDRTrainDataset
     train_dataset = TrainDatasetClass(tokenizer, data_args, shuffle_seed=training_args.seed, cache_dir=data_args.data_cache_dir or model_args.cache_dir)
     eval_dataset = StreamDREvalDataset(tokenizer, data_args, cache_dir=data_args.data_cache_dir or model_args.cache_dir) if data_args.eval_path is not None else None
-
     #tb_callback = TensorBoardCallback()
-
     trainer_cls = GCDenseTrainer if training_args.grad_cache else Trainer
     trainer = trainer_cls(
         model=model,
