@@ -6,16 +6,34 @@ import sys
 
 from transformers import BatchEncoding
 import json
+import copy
+import importlib
+
+from transformers import (
+    AutoConfig,
+    AutoModel,
+    BatchEncoding,
+    PreTrainedModel,
+    T5EncoderModel,
+)
+
+from openmatch.model.linear import LinearHead
 
 from openmatch.arguments import DataArguments
 from openmatch.arguments import DRTrainingArguments as TrainingArguments
 from openmatch.arguments import ModelArguments
-from openmatch.dataset import QPCollator, StreamDRTrainDataset,MappingDRTrainDataset , StreamDREvalDataset
+from openmatch.dataset import (
+    QPCollator,
+    StreamDRTrainDataset,
+    MappingDRTrainDataset,
+    StreamDREvalDataset,
+)
 from openmatch.modeling import DRModel
 from openmatch.trainer import DRTrainer as Trainer
 from openmatch.trainer import GCDenseTrainer
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
-#from transformers.integrations import TensorBoardCallback
+
+# from transformers.integrations import TensorBoardCallback
 from torch import Tensor
 import torch.nn.functional as F
 import torch
@@ -27,47 +45,59 @@ from typing import *
 
 from dataclasses import dataclass
 
+
 @dataclass
 class PromptModelArguments(ModelArguments):
+    use_delta: bool = False
     soft_prompt_token_number: int = 40
     init_from_vocab: bool = True
-    freeze_plm : bool = False
-    
+    freeze_plm: bool = False
+
+
 from transformers.modeling_outputs import ModelOutput
+
+
 @dataclass
 class DROutput(ModelOutput):
     q_reps: Tensor = None
     p_reps: Tensor = None
     loss: Tensor = None
     scores: Tensor = None
-    
-    
-    
+
+
 # Mean Pooling - Take attention mask into account for correct averaging
 def mean_pooling(token_embeddings, attention_mask):
-    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-    
-    
+    input_mask_expanded = (
+        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    )
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+        input_mask_expanded.sum(1), min=1e-9
+    )
+
+
 class PromptDRModel(DRModel):
-  
- 
     def save(self, output_dir: str):
         if not self.tied:
             os.makedirs(os.path.join(output_dir, "query_model"))
             os.makedirs(os.path.join(output_dir, "passage_model"))
-            torch.save(self.lm_q.state_dict(), os.path.join(output_dir, "query_model", "model.ckpt"))
-            torch.save(self.lm_p.state_dict(), os.path.join(output_dir, "passage_model", "model.ckpt"))
+            self.q_delta_model.save_finetuned(
+                os.path.join(output_dir, "query_model", "model.ckpt")
+            )
+            self.p_delta_model.save_finetuned(
+                os.path.join(output_dir, "passage_model", "model.ckpt")
+            )
             if self.head_q is not None:
                 self.head_q.save(os.path.join(output_dir, "query_head"))
                 self.head_p.save(os.path.join(output_dir, "passage_head"))
         else:
-            torch.save(self.lm_q.state_dict(), os.path.join(output_dir, "model.ckpt"))
+            self.q_delta_model.save_finetuned(
+                os.path.join(output_dir, "query_model", "model.ckpt")
+            )
             if self.head_q is not None:
                 self.head_q.save(output_dir)
         with open(os.path.join(output_dir, "openmatch_config.json"), "w") as f:
             json.dump(self._get_config_dict(), f, indent=4)
-    
+
     def encode(self, items, model, head):
         if items is None:
             return None, None
@@ -88,8 +118,14 @@ class PromptDRModel(DRModel):
                 reps = hidden[:, 0, :]
             elif self.pooling == "mean":
                 soft_prompt_attention_mask = items.attention_mask
-                soft_prompt_attention_mask[:, :model.soft_prompt_token_number] = torch.zeros((items.attention_mask.shape[0], model.soft_prompt_token_number))
-                reps = mean_pooling(hidden, soft_prompt_attention_mask) # only pool hidden reps of real tokens
+                soft_prompt_attention_mask[
+                    :, : model.soft_prompt_token_number
+                ] = torch.zeros(
+                    (items.attention_mask.shape[0], model.soft_prompt_token_number)
+                )
+                reps = mean_pooling(
+                    hidden, soft_prompt_attention_mask
+                )  # only pool hidden reps of real tokens
             elif self.pooling == "no":
                 reps = hidden
             else:
@@ -99,16 +135,145 @@ class PromptDRModel(DRModel):
         if self.normalize:
             reps = F.normalize(reps, dim=1)
         return hidden, reps
-    
 
-    
+    @classmethod
+    def build(
+        cls,
+        model_args: ModelArguments,
+        data_args: DataArguments = None,
+        train_args: TrainingArguments = None,
+        **hf_kwargs,
+    ):
+        # load local
+        config = None
+        head_q = head_p = None
+        if os.path.exists(
+            os.path.join(model_args.model_name_or_path, "openmatch_config.json")
+        ):
+            with open(
+                os.path.join(model_args.model_name_or_path, "openmatch_config.json")
+            ) as f:
+                config = json.load(f)
+        if (
+            os.path.isdir(model_args.model_name_or_path) and config is not None
+        ):  # an OpenMatch model
+            tied = config["tied"]
+            if tied:
+                logger.info(
+                    f"loading query model weight from {model_args.model_name_or_path}"
+                )
+                model_name = config["plm_backbone"]["type"]
+                model_class = getattr(
+                    importlib.import_module("transformers"), model_name
+                )
+                lm_q = lm_p = model_class.from_pretrained(
+                    model_args.model_name_or_path, **hf_kwargs
+                )
+                if config["linear_head"]:
+                    head_q = head_p = LinearHead.load(model_args.model_name_or_path)
+            else:
+                _qry_model_path = os.path.join(
+                    model_args.model_name_or_path, "query_model"
+                )
+                _psg_model_path = os.path.join(
+                    model_args.model_name_or_path, "passage_model"
+                )
+                _qry_head_path = os.path.join(
+                    model_args.model_name_or_path, "query_head"
+                )
+                _psg_head_path = os.path.join(
+                    model_args.model_name_or_path, "passage_head"
+                )
+                logger.info(f"loading query model weight from {_qry_model_path}")
+                model_name = config["plm_backbone"]["lm_q_type"]
+                model_class = getattr(
+                    importlib.import_module("transformers"), model_name
+                )
+                if os.path.exists(os.path.join(_qry_model_path, "config.json")):
+                    logger.info(f"loading query model config from {_qry_model_path}")
+                    qry_model_config = AutoConfig.from_pretrained(_qry_model_path)
+                    hf_kwargs["config"] = qry_model_config
+                lm_q = model_class.from_pretrained(_qry_model_path, **hf_kwargs)
+
+                logger.info(f"loading passage model weight from {_psg_model_path}")
+                model_name = config["plm_backbone"]["lm_p_type"]
+                model_class = getattr(
+                    importlib.import_module("transformers"), model_name
+                )
+                if os.path.exists(os.path.join(_psg_model_path, "config.json")):
+                    logger.info(f"loading passage model config from {_psg_model_path}")
+                    psg_model_config = AutoConfig.from_pretrained(_psg_model_path)
+                    hf_kwargs["config"] = psg_model_config
+                lm_p = model_class.from_pretrained(_psg_model_path, **hf_kwargs)
+
+                if config["linear_head"]:
+                    head_q = LinearHead.load(_qry_head_path)
+                    head_p = LinearHead.load(_psg_head_path)
+        else:  # a Huggingface model
+            tied = not model_args.untie_encoder
+            model_class = T5EncoderModel if model_args.encoder_only else AutoModel
+            lm_q = model_class.from_pretrained(
+                model_args.model_name_or_path, **hf_kwargs
+            )
+            lm_p = copy.deepcopy(lm_q) if not tied else lm_q
+            if model_args.add_linear_head:
+                head_q = LinearHead(
+                    model_args.projection_in_dim, model_args.projection_out_dim
+                )
+                head_p = copy.deepcopy(head_q) if not tied else head_q
+
+        model = cls(
+            lm_q=lm_q,
+            lm_p=lm_p,
+            tied=tied,
+            feature=model_args.feature
+            if config is None
+            else config["plm_backbone"]["feature"],
+            pooling=model_args.pooling if config is None else config["pooling"],
+            head_q=head_q,
+            head_p=head_p,
+            normalize=model_args.normalize if config is None else config["normalize"],
+            model_args=model_args,
+            data_args=data_args,
+            train_args=train_args,
+        )
+
+        # move up everything that doesn't have to be set on the model
+        if model_args.use_delta:
+            q_delta_model = SoftPromptModel(
+                model.lm_q,
+                token_init=model_args.init_from_vocab,
+                soft_token_num=model_args.soft_prompt_token_number,
+            )
+            model.lm_q.soft_prompt_token_number = model_args.soft_prompt_token_number
+            if model_args.freeze_plm:
+                q_delta_model.freeze_module(exclude=["deltas"], set_state_dict=True)
+                q_delta_model.log()
+                model.q_delta_model = q_delta_model
+            if model_args.untie_encoder:
+                p_delta_model = SoftPromptModel(
+                    model.lm_p,
+                    token_init=model_args.init_from_vocab,
+                    soft_token_num=model_args.soft_prompt_token_number,
+                )
+                model.lm_p.soft_prompt_token_number = (
+                    model_args.soft_prompt_token_number
+                )
+                if model_args.freeze_plm:
+                    p_delta_model.freeze_module(exclude=["deltas"], set_state_dict=True)
+                model.p_delta_model = p_delta_model
+            else:
+                model.lm_p = model.lm_q
+        return model
 
 
 def train():
     parser = HfArgumentParser((PromptModelArguments, DataArguments, TrainingArguments))
 
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+        model_args, data_args, training_args = parser.parse_json_file(
+            json_file=os.path.abspath(sys.argv[1])
+        )
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
         model_args: ModelArguments
@@ -116,10 +281,10 @@ def train():
         training_args: TrainingArguments
 
     if (
-            os.path.exists(training_args.output_dir)
-            and os.listdir(training_args.output_dir)
-            and training_args.do_train
-            and not training_args.overwrite_output_dir
+        os.path.exists(training_args.output_dir)
+        and os.listdir(training_args.output_dir)
+        and training_args.do_train
+        and not training_args.overwrite_output_dir
     ):
         raise ValueError(
             f"Output directory ({training_args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
@@ -146,12 +311,16 @@ def train():
 
     num_labels = 1
     config = AutoConfig.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+        model_args.config_name
+        if model_args.config_name
+        else model_args.model_name_or_path,
         num_labels=num_labels,
         cache_dir=model_args.cache_dir,
     )
     tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+        model_args.tokenizer_name
+        if model_args.tokenizer_name
+        else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
         use_fast=False,
     )
@@ -162,26 +331,27 @@ def train():
         config=config,
         cache_dir=model_args.cache_dir,
     )
-    delta_model = SoftPromptModel(model.lm_q,
-        token_init=model_args.init_from_vocab,
-        soft_token_num=model_args.soft_prompt_token_number)
-    model.lm_q.soft_prompt_token_number = model_args.soft_prompt_token_number
-    if model_args.freeze_plm:
-        delta_model.freeze_module(exclude=["deltas"],set_state_dict=True)
-        delta_model.log()
-    if model_args.untie_encoder:
-        delta_model = SoftPromptModel(model.lm_q,
-        token_init=model_args.init_from_vocab,
-        soft_token_num=model_args.soft_prompt_token_number)
-        model.lm_p.soft_prompt_token_number = model_args.soft_prompt_token_number
-        if model_args.freeze_plm:
-            delta_model.freeze_module(exclude=["deltas"], set_state_dict=True)
-    else:
-        model.lm_p = model.lm_q
-    TrainDatasetClass = MappingDRTrainDataset if training_args.use_mapping_dataset else StreamDRTrainDataset
-    train_dataset = TrainDatasetClass(tokenizer, data_args, shuffle_seed=training_args.seed, cache_dir=data_args.data_cache_dir or model_args.cache_dir)
-    eval_dataset = StreamDREvalDataset(tokenizer, data_args, cache_dir=data_args.data_cache_dir or model_args.cache_dir) if data_args.eval_path is not None else None
-    #tb_callback = TensorBoardCallback()
+    TrainDatasetClass = (
+        MappingDRTrainDataset
+        if training_args.use_mapping_dataset
+        else StreamDRTrainDataset
+    )
+    train_dataset = TrainDatasetClass(
+        tokenizer,
+        data_args,
+        shuffle_seed=training_args.seed,
+        cache_dir=data_args.data_cache_dir or model_args.cache_dir,
+    )
+    eval_dataset = (
+        StreamDREvalDataset(
+            tokenizer,
+            data_args,
+            cache_dir=data_args.data_cache_dir or model_args.cache_dir,
+        )
+        if data_args.eval_path is not None
+        else None
+    )
+    # tb_callback = TensorBoardCallback()
     trainer_cls = GCDenseTrainer if training_args.grad_cache else Trainer
     trainer = trainer_cls(
         model=model,
@@ -190,11 +360,9 @@ def train():
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         data_collator=QPCollator(
-            tokenizer,
-            max_p_len=data_args.p_max_len,
-            max_q_len=data_args.q_max_len
+            tokenizer, max_p_len=data_args.p_max_len, max_q_len=data_args.q_max_len
         ),
-        #callbacks=[tb_callback]
+        # callbacks=[tb_callback]
     )
     train_dataset.trainer = trainer
 
