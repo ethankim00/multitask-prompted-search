@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class FixedBEIRDataArguments(BEIRDataArguments):
-    query_template: str = ""
-    doc_template: str = ""
+    doc_template: str = "Title: <title> Text: <text>"
+    query_template: str = "<text>"
 
 
 def evaluate(
