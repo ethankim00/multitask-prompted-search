@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class FixedBEIRDataArguments(BEIRDataArguments):
     doc_template: str = "Title: <title> Text: <text>"
     query_template: str = "<text>"
+    log_wandb: bool = False
 
 
 def evaluate(
@@ -125,21 +126,14 @@ def evaluate(
                 ),
             )
         # TODO log all to wandb
+        if data_args.log_wandb:
+            import wandb
+
+            wandb.log(eval_results)
+            wandb.log(query_measures)
 
 
 if __name__ == "__main__":
-
-    try:
-        import wandb
-
-        wandb.init(
-            project="prompt_tuning_information_retrieval",
-            entity="ir-transfer",
-            tags=["eval"],
-        )
-        wandb_logging = True
-    except:
-        pass
 
     parser = HfArgumentParser(
         (ModelArguments, FixedBEIRDataArguments, EncodingArguments)
@@ -154,4 +148,13 @@ if __name__ == "__main__":
         data_args: BEIRDataArguments
         encoding_args: EncodingArguments
 
+    if data_args.log_wandb:
+        import wandb
+
+        wandb.init(
+            project="prompt_tuning_information_retrieval",
+            entity="ir-transfer",
+            tags=["eval"],
+        )
+        wandb_logging = True
     evaluate(model_args=model_args, data_args=data_args, encoding_args=encoding_args)
