@@ -76,15 +76,12 @@ def mean_pooling(token_embeddings, attention_mask):
 
 
 class PromptDRModel(DRModel):
-    
-    
-    
     def __init__(
         self,
         lm_q: PreTrainedModel,
         lm_p: PreTrainedModel,
-        q_delta_model = None,
-        p_delta_model = None,
+        q_delta_model=None,
+        p_delta_model=None,
         tied: bool = True,
         feature: str = "last_hidden_state",
         pooling: str = "first",
@@ -95,13 +92,13 @@ class PromptDRModel(DRModel):
         data_args: DataArguments = None,
         train_args: TrainingArguments = None,
     ):
-        super(PromptDRModel, self).__init__(lm_q = lm_q, lm_p = lm_p)
+        super(PromptDRModel, self).__init__(lm_q=lm_q, lm_p=lm_p)
 
         self.tied = tied
         self.lm_q = lm_q
         self.lm_p = lm_p
-        self.q_delta_model  = q_delta_model 
-        self.p_delta_model  = p_delta_model 
+        self.q_delta_model = q_delta_model
+        self.p_delta_model = p_delta_model
         self.head_q = head_q
         self.head_p = head_p
 
@@ -122,25 +119,18 @@ class PromptDRModel(DRModel):
                 )
             self.process_rank = dist.get_rank()
             self.world_size = dist.get_world_size()
-    
-    
+
     def save(self, output_dir: str):
         if not self.tied:
             os.makedirs(os.path.join(output_dir, "query_model"))
             os.makedirs(os.path.join(output_dir, "passage_model"))
-            self.q_delta_model.save_finetuned(
-                os.path.join(output_dir, "query_model")
-            )
-            self.p_delta_model.save_finetuned(
-                os.path.join(output_dir, "passage_model")
-            )
+            self.q_delta_model.save_finetuned(os.path.join(output_dir, "query_model"))
+            self.p_delta_model.save_finetuned(os.path.join(output_dir, "passage_model"))
             if self.head_q is not None:
                 self.head_q.save(os.path.join(output_dir, "query_head"))
                 self.head_p.save(os.path.join(output_dir, "passage_head"))
         else:
-            self.q_delta_model.save_finetuned(
-                os.path.join(output_dir, "query_model")
-            )
+            self.q_delta_model.save_finetuned(os.path.join(output_dir, "query_model"))
             if self.head_q is not None:
                 self.head_q.save(output_dir)
         with open(os.path.join(output_dir, "openmatch_config.json"), "w") as f:
@@ -183,26 +173,27 @@ class PromptDRModel(DRModel):
         if self.normalize:
             reps = F.normalize(reps, dim=1)
         return hidden, reps
-    
-    
+
     @staticmethod
     def _load_delta_model(model_args, model_type: str):
-        with open(os.path.join(model_args.model_name_or_path, model_type, "config.json")) as f:
+        with open(
+            os.path.join(model_args.model_name_or_path, model_type, "config.json")
+        ) as f:
             config = json.load(f)
         model_name = config["backbone_checkpoint_name"]
-        model_class = getattr(
-                    importlib.import_module("transformers"), model_name
-                )
-        lm = model_class.from_pretrained(
-            model_args.model_name_or_path, **hf_kwargs
-        )
+        model_class = getattr(importlib.import_module("transformers"), model_name)
+        lm = model_class.from_pretrained(model_args.model_name_or_path, **hf_kwargs)
         delta_model = SoftPromptModel(
             lm,
             token_init=model_args.init_from_vocab,
             soft_token_num=model_args.soft_prompt_token_number,
         )
-        delta_model.from_finetuned(os.path.join(model_args.model_name_or_path, model_type), lm, local_files_only=True)
-        return lm, delta_model 
+        delta_model.from_finetuned(
+            os.path.join(model_args.model_name_or_path, model_type),
+            lm,
+            local_files_only=True,
+        )
+        return lm, delta_model
 
     @classmethod
     def build(
@@ -228,14 +219,20 @@ class PromptDRModel(DRModel):
         ):  # an OpenMatch model load from directory, still want to load the backbone model from hub or from cache
             tied = config["tied"]
             if tied:
-                lm_q, q_delta_model = self._load_delta_model(model_args, model_type = "query_model")
+                lm_q, q_delta_model = cls._load_delta_model(
+                    model_args, model_type="query_model"
+                )
                 # TODO support linear dimension reduction head
                 lm_p, p_delta_model = lm_q, q_delta_model
                 if config["linear_head"]:
                     head_q = head_p = LinearHead.load(model_args.model_name_or_path)
             else:
-                lm_q, q_delta_model = self._load_delta_model(model_args, model_type = "query_model")
-                lm_p, p_delta_model = self._load_delta_model(model_args, model_type = "passage_model")
+                lm_q, q_delta_model = cls._load_delta_model(
+                    model_args, model_type="query_model"
+                )
+                lm_p, p_delta_model = cls._load_delta_model(
+                    model_args, model_type="passage_model"
+                )
 
                 if config["linear_head"]:
                     head_q = LinearHead.load(_qry_head_path)
@@ -265,15 +262,15 @@ class PromptDRModel(DRModel):
                         token_init=model_args.init_from_vocab,
                         soft_token_num=model_args.soft_prompt_token_number,
                     )
-                    lm_p.soft_prompt_token_number = (
-                        model_args.soft_prompt_token_number
-                    )
+                    lm_p.soft_prompt_token_number = model_args.soft_prompt_token_number
                     if model_args.freeze_plm:
-                        p_delta_model.freeze_module(exclude=["deltas"], set_state_dict=True)
+                        p_delta_model.freeze_module(
+                            exclude=["deltas"], set_state_dict=True
+                        )
                 else:
-                    lm_p = lm_q      
-            
-            #TODO support linear dimension reduction head
+                    lm_p = lm_q
+
+            # TODO support linear dimension reduction head
             lm_p = copy.deepcopy(lm_q) if not tied else lm_q
             if model_args.add_linear_head:
                 head_q = LinearHead(
@@ -285,8 +282,8 @@ class PromptDRModel(DRModel):
             tied=tied,
             lm_q=lm_q,
             lm_p=lm_p,
-            q_delta_model = q_delta_model,
-            p_delta_model = p_delta_model,
+            q_delta_model=q_delta_model,
+            p_delta_model=p_delta_model,
             feature=model_args.feature
             if config is None
             else config["plm_backbone"]["feature"],
