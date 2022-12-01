@@ -33,7 +33,7 @@ from openmatch.trainer import DRTrainer as Trainer
 from openmatch.trainer import GCDenseTrainer
 
 
-from src.mps.prompt_tuning_model import PromptDRModel
+from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRModel
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
 
 # from transformers.integrations import TensorBoardCallback
