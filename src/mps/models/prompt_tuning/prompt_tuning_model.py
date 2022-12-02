@@ -7,14 +7,15 @@ from transformers import (
 
 import copy
 
-import os 
+import os
 import torch
 from torch import nn, Tensor
 
 import importlib
+import json
 
 
-from typing import Optional, Dict 
+from typing import Optional, Dict
 from dataclasses import dataclass, field
 
 from src.mps.models.utils import HFModelArguments
@@ -49,7 +50,6 @@ from transformers import (
 )
 
 
-
 # Mean Pooling - Take attention mask into account for correct averaging
 def mean_pooling(token_embeddings, attention_mask):
     input_mask_expanded = (
@@ -59,6 +59,7 @@ def mean_pooling(token_embeddings, attention_mask):
         input_mask_expanded.sum(1), min=1e-9
     )
 
+
 @dataclass
 class PromptModelArguments(ModelArguments):
     use_delta: bool = False
@@ -67,9 +68,9 @@ class PromptModelArguments(ModelArguments):
     freeze_plm: bool = True
 
 
-
-
 from transformers.modeling_outputs import ModelOutput
+
+
 @dataclass
 class DROutput(ModelOutput):
     q_reps: Tensor = None
@@ -301,7 +302,6 @@ class PromptDRModel(DRModel):
         return model
 
 
-
 class PromptDRInferenceModel(PromptDRModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -316,9 +316,9 @@ class PromptDRInferenceModel(PromptDRModel):
         return super(PromptDRInferenceModel, self).encode_query(qry)
 
     def forward(
-            self,
-            query: Dict[str, Tensor] = None,
-            passage: Dict[str, Tensor] = None,
+        self,
+        query: Dict[str, Tensor] = None,
+        passage: Dict[str, Tensor] = None,
     ):
         q_hidden, q_reps = self.encode_query(query)
         p_hidden, p_reps = self.encode_passage(passage)
