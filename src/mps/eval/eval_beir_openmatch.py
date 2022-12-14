@@ -1,6 +1,8 @@
 import logging
 import os
 import sys
+import wandb
+
 
 import pytrec_eval
 from openmatch.arguments import DataArguments
@@ -17,17 +19,12 @@ from src.mps.prompt_tuning_model import PromptModelArguments, PromptDRInferenceM
 logger = logging.getLogger(__name__)
 
 
-def main():
-    parser = HfArgumentParser((PromptModelArguments, DataArguments, EncodingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, encoding_args = parser.parse_json_file(
-            json_file=os.path.abspath(sys.argv[1])
-        )
-    else:
-        model_args, data_args, encoding_args = parser.parse_args_into_dataclasses()
-        model_args: PromptModelArguments
-        data_args: DataArguments
-        encoding_args: EncodingArguments
+def eval_beir(
+    model_args: PromptModelArguments,
+    data_args: DataArguments,
+    encoding_args: EncodingArguments,
+    log_wandb=True,
+):
 
     if os.path.exists(encoding_args.output_dir) and os.listdir(
         encoding_args.output_dir
@@ -140,19 +137,41 @@ def main():
         #
         # TODO(cvangysel): add member to RelevanceEvaluator
         #                  with a list of measure names.
+        results = {}
         for measure in sorted(query_measures.keys()):
+            value = pytrec_eval.compute_aggregated_measure(
+                measure,
+                [query_measures[measure] for query_measures in eval_results.values()],
+            )
             print_line(
                 measure,
                 "all",
-                pytrec_eval.compute_aggregated_measure(
-                    measure,
-                    [
-                        query_measures[measure]
-                        for query_measures in eval_results.values()
-                    ],
-                ),
+                value,
             )
+            results["measure"] = value
+        # TODO log to wandb
+        if os.getenv("LOG_WANDB"):
+
+            if log_wandb:
+                import wandb
+
+                wandb.log(results)
+                # Log parameters
+                params_dict = {}
+                data_args.corpus_path
 
 
 if __name__ == "__main__":
-    main()
+    # INIT wandb run
+
+    parser = HfArgumentParser((PromptModelArguments, DataArguments, EncodingArguments))
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, encoding_args = parser.parse_json_file(
+            json_file=os.path.abspath(sys.argv[1])
+        )
+    else:
+        model_args, data_args, encoding_args = parser.parse_args_into_dataclasses()
+        model_args: PromptModelArguments
+        data_args: DataArguments
+        encoding_args: EncodingArguments
+    eval_beir(data_args=data_args, model_args=model_args, encoding_args=encoding_args)
