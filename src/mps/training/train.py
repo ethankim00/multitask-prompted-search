@@ -9,6 +9,8 @@ import json
 import copy
 
 
+from dataclasses import asdict
+
 from transformers import (
     AutoConfig,
     AutoModel,
@@ -60,6 +62,19 @@ def train():
         data_args: DataArguments
         training_args: TrainingArguments
 
+    if os.getenv("LOG_WANDB"):
+        import wandb
+
+        wandb.init(
+            project="prompt_tuning_information_retrieval",
+            entity="ir-transfer",
+            tags=["train", "beir_expand"],
+        )
+        training_args.report_to = "wandb"
+        model_params = asdict(training_args)
+        model_params["train_dataset"] = data_args.dataset
+        model_params.update(asdict(model_args))
+        wandb.config.update(model_params)
     if (
         os.path.exists(training_args.output_dir)
         and os.listdir(training_args.output_dir)
