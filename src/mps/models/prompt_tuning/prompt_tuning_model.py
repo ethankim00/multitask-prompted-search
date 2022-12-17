@@ -10,7 +10,7 @@ import copy
 import os
 import torch
 from torch import nn, Tensor
-
+import numpy as np
 import importlib
 import json
 
@@ -62,7 +62,7 @@ def mean_pooling(token_embeddings, attention_mask):
 
 @dataclass
 class PromptModelArguments(ModelArguments):
-    use_delta: bool = False
+    use_delta: bool = True
     soft_prompt_token_number: int = 40
     init_from_vocab: bool = True
     freeze_plm: bool = True
@@ -139,6 +139,14 @@ class PromptDRModel(DRModel):
                 self.head_q.save(output_dir)
         with open(os.path.join(output_dir, "openmatch_config.json"), "w") as f:
             json.dump(self._get_config_dict(), f, indent=4)
+        if os.getenv("LOG_WANDB"):
+            import wandb
+
+            if not self.tied:
+                wandb.save(os.path.join(output_dir, "query_model", base_path="./"))
+                wandb.save(os.path.join(output_dir, "passage_model", base_path="./"))
+            else:
+                wandb.save(os.path.join(output_dir, "query_model", base_path="./"))
 
     def encode(self, items, model, head):
         if items is None:
@@ -185,8 +193,10 @@ class PromptDRModel(DRModel):
         ) as f:
             config = json.load(f)
         model_name = config["backbone_checkpoint_name"]
-        #model_class = getattr(importlib.import_module("transformers"), model_name)
-        lm = AutoModel.from_pretrained(model_name, **hf_kwargs) # TODO: have to fix if we ever train a non backbone model
+        # model_class = getattr(importlib.import_module("transformers"), model_name)
+        lm = AutoModel.from_pretrained(
+            model_name, **hf_kwargs
+        )  # TODO: have to fix if we ever train a non backbone model
         lm.soft_prompt_token_number = model_args.soft_prompt_token_number
         delta_model = SoftPromptModel(
             lm,
