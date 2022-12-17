@@ -7,7 +7,7 @@ import sys
 from transformers import BatchEncoding
 import json
 import copy
-import importlib
+
 
 from transformers import (
     AutoConfig,
@@ -32,7 +32,7 @@ from openmatch.trainer import DRTrainer as Trainer
 from openmatch.trainer import GCDenseTrainer
 
 
-from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRModel
+from src.mps.prompt_tuning_model import PromptDRModel, PromptModelArguments
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
 
 # from transformers.integrations import TensorBoardCallback
@@ -40,41 +40,11 @@ from torch import Tensor, nn
 import torch.nn.functional as F
 import torch
 
-from opendelta import SoftPromptModel
 
 logger = logging.getLogger(__name__)
 from typing import *
 
 from dataclasses import dataclass
-
-
-@dataclass
-class PromptModelArguments(ModelArguments):
-    use_delta: bool = False
-    soft_prompt_token_number: int = 40
-    init_from_vocab: bool = True
-    freeze_plm: bool = True
-
-
-from transformers.modeling_outputs import ModelOutput
-
-
-@dataclass
-class DROutput(ModelOutput):
-    q_reps: Tensor = None
-    p_reps: Tensor = None
-    loss: Tensor = None
-    scores: Tensor = None
-
-
-# Mean Pooling - Take attention mask into account for correct averaging
-def mean_pooling(token_embeddings, attention_mask):
-    input_mask_expanded = (
-        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    )
-    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
-        input_mask_expanded.sum(1), min=1e-9
-    )
 
 
 def train():

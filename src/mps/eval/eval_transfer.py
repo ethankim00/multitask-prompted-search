@@ -16,13 +16,17 @@ from pathlib import Path
 
 from src.mps.utils import download_dataset, BeirDatasetArguments
 
+from .eval_beir_openmatch import eval_beir
+
 import pandas as pd
 import wandb
 
 
 import logging
-logging.basicConfig(level = logging.INFO)
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class TransferEvaluationArguments:
@@ -85,9 +89,11 @@ def get_weighted_prompts(
         embeddings = embeddings_dict[domain]
         transfer_embeddings += embeddings * weight
     return transfer_embeddings
-                                 
-                                 
-def load_wandb_embeddings(tag: str, project: str = "ir-transfer/prompt_tuning_information_retrieval") -> Dict[str, np.ndarray]:
+
+
+def load_wandb_embeddings(
+    tag: str, project: str = "ir-transfer/prompt_tuning_information_retrieval"
+) -> Dict[str, np.ndarray]:
     runs = api.runs(project)
     embedding_dict = {}
     for run in runs:
@@ -95,26 +101,39 @@ def load_wandb_embeddings(tag: str, project: str = "ir-transfer/prompt_tuning_in
             dataset = run.config["train_dataset"]
             run_path = project + "/" + run.id
             root_path = "./models/" + tag + dataset
-            embedding_path = wandb.restore("prompt_embeddings.npz", run_path = run_path, root = root_path)
-            embeddings = np.load(open(Path(root_path).joinpath("prompt_embeddings.npz"), "rb"))
+            embedding_path = wandb.restore(
+                "prompt_embeddings.npz", run_path=run_path, root=root_path
+            )
+            embeddings = np.load(
+                open(Path(root_path).joinpath("prompt_embeddings.npz"), "rb")
+            )
             embedding_dict[dataset] = embeddings
     return embedding_dict
-
 
 
 def eval_transfer(eval_args: TransferEvaluationArguments, wandb_logging: bool = False):
     logger.info("Running OOD transfer Experiment")
     source_datasets = DATASET_GROUPS[eval_args.source_dataset_group]
     runs = api.runs("ir-transfer/prompt_tuning_information_retrieval")
-    source_datatsets = [run.config["train_dataset"] for run in runs if eval_args.source_dataset_group in run.tags]
+    source_datatsets = [
+        run.config["train_dataset"]
+        for run in runs
+        if eval_args.source_dataset_group in run.tags
+    ]
     for dataset in source_datasets:
-        dataset_args = BeirDatasetArguments(
-        dataset=dataset, data_dir="./data"
-        )
+        dataset_args = BeirDatasetArguments(dataset=dataset, data_dir="./data")
     data_path = download_dataset(dataset_args)
-    logger.info("Using {} source datasets from {}".format(len(source_datasets), eval_args.source_dataset_group))
+    logger.info(
+        "Using {} source datasets from {}".format(
+            len(source_datasets), eval_args.source_dataset_group
+        )
+    )
     logger.info("Base Model is {}".format(eval_args.model_name_or_path))
-    logger.info("Determining Domain Similarity with {} top k {} and temperature {}".format(eval_args.similarity_method, eval_args.top_k, eval_args.temperature))
+    logger.info(
+        "Determining Domain Similarity with {} top k {} and temperature {}".format(
+            eval_args.similarity_method, eval_args.top_k, eval_args.temperature
+        )
+    )
     if eval_args.load_from_wandb:
         embedding_dict = load_wandb_embeddings(eval_args.source_model_path)
     else:
@@ -122,7 +141,9 @@ def eval_transfer(eval_args: TransferEvaluationArguments, wandb_logging: bool = 
     domain_similarity = DomainSimilarity(
         domains=list(embedding_dict.keys()), method=eval_args.similarity_method
     )
-    scores = domain_similarity.return_domain_similarities(eval_args.target_dataset, k = eval_args.top_k)
+    scores = domain_similarity.return_domain_similarities(
+        eval_args.target_dataset, k=eval_args.top_k
+    )
     weights = get_weights(scores, temperature=eval_args.temperature)
     if wandb_logging:
         wandb.log({"weights": weights})
@@ -131,30 +152,35 @@ def eval_transfer(eval_args: TransferEvaluationArguments, wandb_logging: bool = 
         eval_args.source_dataset_group
         + eval_args.similarity_method
         + eval_args.target_dataset
-        #+ eval_args.temperature
-        #+ str(eval_args.top_k)
+        # + eval_args.temperature
+        # + str(eval_args.top_k)
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     embedding_output_path = output_dir.joinpath("prompt_embeddings.npz")
     config_dict = asdict(eval_args)
-    
     sample_run = [run for run in runs if eval_args.source_model_path in run.tags][0]
-    config_dict.update({"model_name_or_path":eval_args.model_name_or_path})
+    config_dict.update({"model_name_or_path": eval_args.model_name_or_path})
     config_output_path = output_dir.joinpath("config.json")
     config_dict.update(sample_run.config)
     json.dump(config_dict, open(str(config_output_path), "w"))
-    np.save(open(str(embedding_output_path), "wb"), prompt_embeddings)        
+    np.save(
+        open(str(embedding_output_path), "wb"), prompt_embeddings
+    )  # Save averaged prompts to file for eval script to load
     eval_script_args = EvaluationArguments(
-        model_name_or_path=str(output_dir), dataset=eval_args.target_dataset, split="test"
+        model_name_or_path=str(output_dir),
+        dataset=eval_args.target_dataset,
+        split="test",
     )
-    evaluate(eval_script_args, wandb_logging = wandb_logging)
+    evaluate(eval_script_args, wandb_logging=wandb_logging)
+
 
 if __name__ == "__main__":
-    api = wandb.Api()            
+    api = wandb.Api()
     parser = HfArgumentParser(TransferEvaluationArguments)
-    eval_args = parser.parse_args_into_dataclasses()[0]                    
+    eval_args = parser.parse_args_into_dataclasses()[0]
     # try:
     import wandb
+
     wandb.init(
         project="prompt_tuning_information_retrieval",
         entity="ir-transfer",
@@ -164,4 +190,4 @@ if __name__ == "__main__":
     # except:
     #     pass
     wandb.config.update(asdict(eval_args))
-    eval_transfer(eval_args, wandb_logging = wandb_logging)
+    eval_transfer(eval_args, wandb_logging=wandb_logging)
