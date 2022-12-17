@@ -1,4 +1,5 @@
 wandb
-sentence_transformers
 opendelta
 beir
+pytrec_eval
+wget
