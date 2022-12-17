@@ -179,14 +179,15 @@ class PromptDRModel(DRModel):
         return hidden, reps
 
     @staticmethod
-    def _load_delta_model(model_args, model_type: str):
+    def _load_delta_model(model_args, model_type: str, **hf_kwargs):
         with open(
             os.path.join(model_args.model_name_or_path, model_type, "config.json")
         ) as f:
             config = json.load(f)
         model_name = config["backbone_checkpoint_name"]
-        model_class = getattr(importlib.import_module("transformers"), model_name)
-        lm = model_class.from_pretrained(model_args.model_name_or_path, **hf_kwargs)
+        #model_class = getattr(importlib.import_module("transformers"), model_name)
+        lm = AutoModel.from_pretrained(model_name, **hf_kwargs) # TODO: have to fix if we ever train a non backbone model
+        lm.soft_prompt_token_number = model_args.soft_prompt_token_number
         delta_model = SoftPromptModel(
             lm,
             token_init=model_args.init_from_vocab,
