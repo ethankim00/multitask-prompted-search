@@ -4,31 +4,33 @@ import os
 import sys
 
 import pytrec_eval
-from openmatch.arguments import BEIRDataArguments
+
 from openmatch.arguments import InferenceArguments as EncodingArguments
-from openmatch.arguments import ModelArguments
+from openmatch.arguments import ModelArguments, DataArguments
 from openmatch.dataset import BEIRDataset
 from openmatch.modeling import DRModelForInference
 from openmatch.retriever import Retriever
 
 
-from src.mps.prompt_tuning_model import PromptDRInferenceModel, PromptModelArguments
+from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRInferenceModel, PromptModelArguments
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser
 
 logger = logging.getLogger(__name__)
 
 
-class FixedBEIRDataArguments(BEIRDataArguments):
+class FixedBEIRDataArguments(DataArguments):
     doc_template: str = "Title: <title> Text: <text>"
     query_template: str = "<text>"
     log_wandb: bool = False
+    data_dir: str = "./data/beir/nfcorpus/"
 
 
 def evaluate(
-    model_args: ModelArguments,
+    model_args: PromptModelArguments,
     data_args: FixedBEIRDataArguments,
     encoding_args: EncodingArguments,
 ):
+    print(data_args)
     if os.path.exists(encoding_args.output_dir) and os.listdir(
         encoding_args.output_dir
     ):
@@ -81,6 +83,7 @@ def evaluate(
         cache_dir=model_args.cache_dir,
     )
 
+    print(data_args)
     beir_dataset = BEIRDataset(
         tokenizer=tokenizer,
         data_args=data_args,
@@ -128,7 +131,6 @@ def evaluate(
         # TODO log all to wandb
         if data_args.log_wandb:
             import wandb
-
             wandb.log(eval_results)
             wandb.log(query_measures)
 
@@ -136,7 +138,7 @@ def evaluate(
 if __name__ == "__main__":
 
     parser = HfArgumentParser(
-        (ModelArguments, FixedBEIRDataArguments, EncodingArguments)
+        (PromptModelArguments, FixedBEIRDataArguments, EncodingArguments)
     )
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, encoding_args = parser.parse_json_file(
@@ -144,17 +146,18 @@ if __name__ == "__main__":
         )
     else:
         model_args, data_args, encoding_args = parser.parse_args_into_dataclasses()
-        model_args: ModelArguments
-        data_args: BEIRDataArguments
-        encoding_args: EncodingArguments
+        # model_args: ModelArguments
+        # data_args: FixedBEIRDataArguments
+        # encoding_args: EncodingArguments
 
     if data_args.log_wandb:
         import wandb
-
         wandb.init(
             project="prompt_tuning_information_retrieval",
             entity="ir-transfer",
             tags=["eval"],
         )
         wandb_logging = True
+    print(type(data_args))
+    data_args = FixedBEIRDataArguments()
     evaluate(model_args=model_args, data_args=data_args, encoding_args=encoding_args)
