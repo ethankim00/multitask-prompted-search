@@ -26,7 +26,6 @@ from openmatch.dataset import (
     QPCollator,
     StreamDRTrainDataset,
     MappingDRTrainDataset,
-    StreamDREvalDataset,
 )
 
 from openmatch.trainer import DRTrainer as Trainer
@@ -121,13 +120,16 @@ def train():
     set_seed(training_args.seed)
 
     num_labels = 1
-    config = AutoConfig.from_pretrained(
-        model_args.config_name
-        if model_args.config_name
-        else model_args.model_name_or_path,
-        num_labels=num_labels,
-        cache_dir=model_args.cache_dir,
-    )
+    try:
+        config = AutoConfig.from_pretrained(
+            model_args.config_name
+            if model_args.config_name
+            else model_args.model_name_or_path,
+            num_labels=num_labels,
+            cache_dir=model_args.cache_dir,
+        )
+    except:
+        config = None
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
@@ -154,7 +156,7 @@ def train():
         cache_dir=data_args.data_cache_dir or model_args.cache_dir,
     )
     eval_dataset = (
-        StreamDREvalDataset(
+        StreamDRTrainDataset(
             tokenizer,
             data_args,
             cache_dir=data_args.data_cache_dir or model_args.cache_dir,
