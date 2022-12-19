@@ -34,7 +34,7 @@ from openmatch.trainer import DRTrainer as Trainer
 from openmatch.trainer import GCDenseTrainer
 
 
-from src.mps.prompt_tuning_model import PromptDRModel, PromptModelArguments
+from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRModel, PromptModelArguments
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
 
 # from transformers.integrations import TensorBoardCallback
@@ -70,9 +70,8 @@ def train():
             entity="ir-transfer",
             tags=["train", "beir_expand"],
         )
-        training_args.report_to = "wandb"
+        training_args.report_to = ["wandb"]
         model_params = asdict(training_args)
-        model_params["train_dataset"] = data_args.dataset
         model_params.update(asdict(model_args))
         wandb.config.update(model_params)
     if (

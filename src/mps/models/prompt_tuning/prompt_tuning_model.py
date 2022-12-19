@@ -139,14 +139,14 @@ class PromptDRModel(DRModel):
                 self.head_q.save(output_dir)
         with open(os.path.join(output_dir, "openmatch_config.json"), "w") as f:
             json.dump(self._get_config_dict(), f, indent=4)
-        if os.getenv("LOG_WANDB"):
-            import wandb
-
-            if not self.tied:
-                wandb.save(os.path.join(output_dir, "query_model", base_path="./"))
-                wandb.save(os.path.join(output_dir, "passage_model", base_path="./"))
-            else:
-                wandb.save(os.path.join(output_dir, "query_model", base_path="./"))
+        # if os.getenv("LOG_WANDB"):
+        import wandb
+        logger.info("Uploading Checkpoint to Wandb")
+        if not self.tied:
+            wandb.save(os.path.join(output_dir, "query_model/*"), base_path="./", policy = "end")
+            wandb.save(os.path.join(output_dir, "passage_model/*"), base_path="./", policy = "end")
+        else:
+            wandb.save(os.path.join(output_dir, "query_model/*"), base_path="./", policy = "end")
 
     def encode(self, items, model, head):
         if items is None:
