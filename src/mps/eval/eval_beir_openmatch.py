@@ -14,7 +14,8 @@ from openmatch.retriever import Retriever
 from openmatch.utils import save_as_trec
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser
 
-from src.mps.prompt_tuning_model import PromptModelArguments, PromptDRInferenceModel
+from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRInferenceModel, PromptModelArguments
+
 
 logger = logging.getLogger(__name__)
 
