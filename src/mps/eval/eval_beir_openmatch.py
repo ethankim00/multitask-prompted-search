@@ -57,14 +57,14 @@ def eval_beir(
     logger.info("Encoding parameters %s", encoding_args)
     logger.info("MODEL parameters %s", model_args)
 
-    num_labels = 1
-    config = AutoConfig.from_pretrained(
-        model_args.config_name
-        if model_args.config_name
-        else model_args.model_name_or_path,
-        num_labels=num_labels,
-        cache_dir=model_args.cache_dir,
-    )
+    # num_labels = 1
+    # config = AutoConfig.from_pretrained(
+    #     model_args.config_name
+    #     if model_args.config_name
+    #     else model_args.model_name_or_path,
+    #     num_labels=num_labels,
+    #     cache_dir=model_args.cache_dir,
+    # )
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
@@ -74,7 +74,7 @@ def eval_beir(
 
     model = PromptDRInferenceModel.build(
         model_args=model_args,
-        config=config,
+        # config=config,
         cache_dir=model_args.cache_dir,
     )
 
