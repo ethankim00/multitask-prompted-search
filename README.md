@@ -27,10 +27,34 @@ pip install .
 
 ### Download DPR
 
+```
+sh scripts/download_dpr_data.sh
+```
+
 ### Convert to Openmatch Format 
 
+```
+sh scripts/process_pretraining_data.sh
+```
+### Multitask Pretrain the base Model
 
-### Train the dense Encoder
+Train on the multitask mixture of 4 datasets from the DPR paper. Follow the recommended hyperparameters and train for 40 epochs with bs = 128
+
+```
+python -m torch.distributed.launch --nproc_per_node=8
+--model_name_or_path bert-base-uncased \
+--train_n_passages 1 \
+--output_dir ./models/base_model \
+--report_to wandb \
+--use_delta True \
+--untie_encoder True \
+--pooling mean \
+--normalize True\
+--train_dir ./data/pretraining/ 
+--overwrite_output_dir True 
+--save_steps 1000 \
+--per_device_train_batch_size 16 \
+```
 
 
 ## Train Dense Encoders for Each Domain 
