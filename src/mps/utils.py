@@ -148,7 +148,7 @@ def process_one(query_dataset, corpus_dataset, q, poss):
     return train_example
 
 
-def construct_beir_training_datast(dataset_name: str, tokenizer):
+def construct_beir_training_dataset(dataset_name: str, tokenizer):
     data_dir = download_dataset(dataset_name)
     validate_data_splits(data_dir)
     qrels_dir = os.path.join(data_dir, "qrels")

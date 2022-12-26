@@ -34,8 +34,12 @@ from openmatch.trainer import DRTrainer as Trainer
 from openmatch.trainer import GCDenseTrainer
 
 
-from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRModel, PromptModelArguments
+from src.mps.models.prompt_tuning.prompt_tuning_model import (
+    PromptDRModel,
+    PromptModelArguments,
+)
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
+from src.mps.utils import construct_beir_training_dataset
 
 # from transformers.integrations import TensorBoardCallback
 from torch import Tensor, nn
@@ -46,11 +50,23 @@ import torch
 logger = logging.getLogger(__name__)
 from typing import *
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass
+class BEIRDataArguments(DataArguments):
+    train_dataset: str = field(
+        default=None, metadata={"help": "name of train dataset to use"}
+    )
+    eval_dataset: str = field(
+        default=None, metadata={"help": "name of eval dataset to use"}
+    )
 
 
 def train():
-    parser = HfArgumentParser((PromptModelArguments, DataArguments, TrainingArguments))
+    parser = HfArgumentParser(
+        (PromptModelArguments, BEIRDataArguments, TrainingArguments)
+    )
 
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file(
@@ -114,6 +130,10 @@ def train():
         )
     except:
         config = None
+    if data_args.train_dataset is not None:
+        train_dir = construct_beir_training_dataset(data_args.train_dataset)
+        data_args.train_path = train_dir
+        # data_args.eval_path = pass # TODO set eval dataset
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
