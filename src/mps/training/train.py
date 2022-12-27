@@ -78,7 +78,7 @@ def train():
         data_args: DataArguments
         training_args: TrainingArguments
 
-    if os.getenv("LOG_WANDB"):
+    if not os.getenv("WANDB_DISABLED"):
         import wandb
 
         wandb.init(
@@ -130,6 +130,13 @@ def train():
         )
     except:
         config = None
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name
+        if model_args.tokenizer_name
+        else model_args.model_name_or_path,
+        cache_dir=model_args.cache_dir,
+        use_fast=False,
+    )
     if data_args.train_dataset is not None:
         train_dir = construct_beir_dataset(
             data_args.train_dataset, tokenizer=tokenizer, split="train"
@@ -140,13 +147,6 @@ def train():
                 data_args.train_dataset, tokenizer=tokenizer, split="dev"
             )
             data_args.eval_path = os.path.join(eval_dir, "om_dev.jsonl")
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name
-        if model_args.tokenizer_name
-        else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=False,
-    )
     model = PromptDRModel.build(
         model_args,
         data_args,
