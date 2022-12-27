@@ -4,10 +4,12 @@ import logging
 import os
 import random
 import requests
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from pathlib import Path
+
 
 import numpy as np
 import pandas as pd
@@ -23,6 +25,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+
+@dataclass
+class BEIRDataArguments(DataArguments):
+    train_dataset: str = field(
+        default=None, metadata={"help": "name of train dataset to use"}
+    )
+    eval_dataset: str = field(
+        default=None, metadata={"help": "name of eval dataset to use"}
+    )
 
 
 
@@ -83,7 +94,7 @@ def download_dataset(dataset: str) -> str:
             data_dir=Path(data_dir).joinpath("oag_qa")
         )
         data_dir = converter.convert(dataset)
-    elif dataset_args.dataset in CQA_DATASETS:
+    elif dataset in CQA_DATASETS:
         url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/cqadupstack.zip"
         out_dir = os.path.join(Path("./", data_dir))
         data_dir = download_and_unzip(url, out_dir)
