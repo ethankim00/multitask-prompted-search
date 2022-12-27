@@ -53,8 +53,6 @@ from typing import *
 from dataclasses import dataclass, field
 
 
-
-
 def train():
     parser = HfArgumentParser(
         (PromptModelArguments, BEIRDataArguments, TrainingArguments)
@@ -183,6 +181,38 @@ def train():
 
     trainer.train()
     trainer.save_model()
+
+    # save model to wandb
+    if not os.getenv("WANDB_DISABLED"):
+        # save the passage model
+        if not model_args.tied:
+            wandb.save(
+                os.path.join(training_args.output_dir, "passage_model/*"), policy="now"
+            )
+            wandb.save(
+                os.path.join(training_args.output_dir, "query_model/*"),
+                policy="now",
+            )
+        else:
+            wandb.save(
+                os.path.join(training_args.output_dir, "pytoch_model.bin"), policy="now"
+            )
+            wandb.save(
+                os.path.join(training_args.output_dir, "config.json"), policy="now"
+            )
+        wandb.save(
+            os.path.join(training_args.output_dir, "training_args.bin"), policy="now"
+        )
+        wandb.save(
+            os.path.join(training_args.output_dir, "tokenizer_config.json"),
+            policy="now",
+        )
+        wandb.save(
+            os.path.join(training_args.output_dir, "special_tokens_map.json"),
+            policy="now",
+        )
+        wandb.save(os.path.join(training_args.output_dir, "vocab.txt"), policy="now")
+
     if trainer.is_world_process_zero():
         tokenizer.save_pretrained(training_args.output_dir)
 
