@@ -15,9 +15,12 @@ from openmatch.utils import save_as_trec
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser
 
 
-from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRInferenceModel, PromptModelArguments
+from src.mps.models.prompt_tuning.prompt_tuning_model import (
+    PromptDRInferenceModel,
+    PromptModelArguments,
+)
 from src.mps.utils import construct_beir_dataset, BEIRDataArguments
-
+from src.mps.datasets import DATASET_GROUPS_MAPPING
 
 
 logger = logging.getLogger(__name__)
@@ -80,13 +83,13 @@ def eval_beir(
         # config=config,
         cache_dir=model_args.cache_dir,
     )
-    
+
     if data_args.eval_dataset is not None:
         eval_dir = construct_beir_dataset(
             data_args.eval_dataset, tokenizer=tokenizer, split="test"
         )
         data_args.data_dir = eval_dir
-        
+
     beir_dataset = BEIRDataset(
         tokenizer=tokenizer,
         data_args=data_args,
@@ -159,22 +162,22 @@ def eval_beir(
                 value,
             )
             results["measure"] = value
-        # TODO log to wandb
-        if os.getenv("LOG_WANDB"):
-
-            if log_wandb:
-                import wandb
-
-                wandb.log(results)
-                # Log parameters
-                params_dict = {}
-                data_args.corpus_path
+        if os.getenv("WANDB_DISABLED"):
+            wandb.init(
+                project="prompt_tuning_information_retrieval",
+                entity="ir-transfer",
+                tags=["eval", DATASET_GROUPS_MAPPING[data_args.eval_dataset]],
+            )
+            output_dict = {}
+            for args in [model_args, data_args, encoding_args]:
+                output_dict.update(args.to_dict())
+            output_dict.update(results)
 
 
 if __name__ == "__main__":
-    # INIT wandb run
-
-    parser = HfArgumentParser((PromptModelArguments, BEIRDataArguments, EncodingArguments))
+    parser = HfArgumentParser(
+        (PromptModelArguments, BEIRDataArguments, EncodingArguments)
+    )
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, encoding_args = parser.parse_json_file(
             json_file=os.path.abspath(sys.argv[1])

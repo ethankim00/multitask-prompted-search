@@ -144,7 +144,6 @@ OAG_DATASETS = [
 ]
 
 
-
 TOP_LEVEL_OAG_DATASETS = {
     "GEOMETRY": [
         "geometry",
@@ -241,8 +240,6 @@ TOP_LEVEL_OAG_DATASETS = {
 }
 
 
-
-
 DATASET_GROUPS = {
     "beir": BEIR_DATASETS,
     "cqa": CQA_DATASETS,
@@ -251,3 +248,9 @@ DATASET_GROUPS = {
     "beir_full": FULL_BEIR_DATASETS,
     "beir_expand": BEIR_DATASETS_WO_CQA + CQA_DATASETS,
 }
+
+# invert the Datset gropups dictionary
+DATASET_GROUPS_MAPPING = {}
+for k, v in DATASET_GROUPS.items():
+    for v_ in v:
+        DATASET_GROUPS_MAPPING[v_] = k
