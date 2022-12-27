@@ -23,10 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class BeirDatasetArguments:
-    dataset: str = field(default=None, metadata={"help": "Beir Dataset to train on"})
-    data_dir: str = "./data"
+
 
 
 def download_url(url: str, save_path: str, chunk_size: int = 1024):
@@ -49,25 +46,48 @@ def download_url(url: str, save_path: str, chunk_size: int = 1024):
         for data in r.iter_content(chunk_size=chunk_size):
             size = fd.write(data)
             bar.update(size)
+            
+            
+def unzip(zip_file: str, out_dir: str):
+    zip_ = zipfile.ZipFile(zip_file, "r")
+    zip_.extractall(path=out_dir)
+    zip_.close()
+
+def download_and_unzip(url: str, out_dir: str, chunk_size: int = 1024) -> str:
+    
+    os.makedirs(out_dir, exist_ok=True)
+    dataset = url.split("/")[-1]
+    zip_file = os.path.join(out_dir, dataset)
+    
+    if not os.path.isfile(zip_file):
+        logger.info("Downloading {} ...".format(dataset))
+        download_url(url, zip_file, chunk_size)
+    
+    if not os.path.isdir(zip_file.replace(".zip", "")):
+        logger.info("Unzipping {} ...".format(dataset))
+        unzip(zip_file, out_dir)
+    
+    return os.path.join(out_dir, dataset.replace(".zip", ""))
 
 
-def download_dataset(dataset_args: BeirDatasetArguments) -> str:
-    if dataset_args.dataset in BEIR_DATASETS:
+def download_dataset(dataset: str) -> str:
+    data_dir = "./data"
+    if dataset in BEIR_DATASETS:
         url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip".format(
-            dataset_args.dataset
+            dataset
         )
-        out_dir = os.path.join(Path("./", dataset_args.data_dir))
-        data_dir = util.download_and_unzip(url, out_dir)
-    elif dataset_args.dataset in OAG_DATASETS:
+        out_dir = os.path.join(Path("./", data_dir))
+        data_dir = download_and_unzip(url, out_dir)
+    elif dataset in OAG_DATASETS:
         converter = OAGBeirConverter(
-            data_dir=Path(dataset_args.data_dir).joinpath("oag_qa")
+            data_dir=Path(data_dir).joinpath("oag_qa")
         )
-        data_dir = converter.convert(dataset_args.dataset)
+        data_dir = converter.convert(dataset)
     elif dataset_args.dataset in CQA_DATASETS:
         url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/cqadupstack.zip"
-        out_dir = os.path.join(Path("./", dataset_args.data_dir))
-        data_dir = util.download_and_unzip(url, out_dir)
-        data_dir = data_dir + "/" + dataset_args.dataset
+        out_dir = os.path.join(Path("./", data_dir))
+        data_dir = download_and_unzip(url, out_dir)
+        data_dir = data_dir + "/" + dataset
     # elif dataset_args.dataset in TOP_LEVEL_OAG:
     #     s    pass
     # TODO logic for top level oag topics
@@ -174,7 +194,7 @@ def construct_beir_dataset(dataset_name: str, tokenizer, split: str = "train"):
     data_dir = download_dataset(dataset_name)
     validate_data_splits(data_dir)
     qrels_dir = os.path.join(data_dir, "qrels")
-    save_to = os.path.join(data_dir, "om_{}jsonl".format(split))
+    save_to = os.path.join(data_dir, "om_{}.jsonl".format(split))
     qrels_file = os.path.join(qrels_dir, "{}.tsv".format(split))
     data_args = DataArguments(
         corpus_path=os.path.join(data_dir, "corpus.jsonl"),
