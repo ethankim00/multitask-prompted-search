@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import random
+import requests
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
@@ -13,7 +14,6 @@ import pandas as pd
 from tqdm import tqdm
 from transformers import AutoTokenizer, HfArgumentParser
 
-from beir import LoggingHandler, util
 from openmatch.arguments import DataArguments
 from openmatch.dataset import InferenceDataset
 from openmatch.utils import load_beir_positives
@@ -27,6 +27,28 @@ logger = logging.getLogger(__name__)
 class BeirDatasetArguments:
     dataset: str = field(default=None, metadata={"help": "Beir Dataset to train on"})
     data_dir: str = "./data"
+
+
+def download_url(url: str, save_path: str, chunk_size: int = 1024):
+    """Download url with progress bar using tqdm
+    https://stackoverflow.com/questions/15644964/python-progress-bar-and-downloads
+    Args:
+        url (str): downloadable url
+        save_path (str): local path to save the downloaded file
+        chunk_size (int, optional): chunking of files. Defaults to 1024.
+    """
+    r = requests.get(url, stream=True)
+    total = int(r.headers.get("Content-Length", 0))
+    with open(save_path, "wb") as fd, tqdm(
+        desc=save_path,
+        total=total,
+        unit="iB",
+        unit_scale=True,
+        unit_divisor=chunk_size,
+    ) as bar:
+        for data in r.iter_content(chunk_size=chunk_size):
+            size = fd.write(data)
+            bar.update(size)
 
 
 def download_dataset(dataset_args: BeirDatasetArguments) -> str:

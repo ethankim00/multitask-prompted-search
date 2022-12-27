@@ -1,5 +1,4 @@
 wandb
 opendelta
-beir
 pytrec_eval
 wget
