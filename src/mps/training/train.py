@@ -39,7 +39,7 @@ from src.mps.models.prompt_tuning.prompt_tuning_model import (
     PromptModelArguments,
 )
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
-from src.mps.utils import construct_beir_dataset
+from src.mps.utils import construct_beir_dataset, BEIRDataArguments
 
 # from transformers.integrations import TensorBoardCallback
 from torch import Tensor, nn
@@ -53,14 +53,6 @@ from typing import *
 from dataclasses import dataclass, field
 
 
-@dataclass
-class BEIRDataArguments(DataArguments):
-    train_dataset: str = field(
-        default=None, metadata={"help": "name of train dataset to use"}
-    )
-    eval_dataset: str = field(
-        default=None, metadata={"help": "name of eval dataset to use"}
-    )
 
 
 def train():
