@@ -14,7 +14,10 @@ from openmatch.retriever import Retriever
 from openmatch.utils import save_as_trec
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser
 
+
 from src.mps.models.prompt_tuning.prompt_tuning_model import PromptDRInferenceModel, PromptModelArguments
+from src.mps.utils import construct_beir_dataset, BEIRDataArguments
+
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def eval_beir(
     model_args: PromptModelArguments,
-    data_args: DataArguments,
+    data_args: BEIRDataArguments,
     encoding_args: EncodingArguments,
     log_wandb=True,
 ):
@@ -77,7 +80,13 @@ def eval_beir(
         # config=config,
         cache_dir=model_args.cache_dir,
     )
-
+    
+    if data_args.eval_dataset is not None:
+        eval_dir = construct_beir_dataset(
+            data_args.eval_dataset, tokenizer=tokenizer, split="test"
+        )
+        data_args.data_dir = eval_dir
+        
     beir_dataset = BEIRDataset(
         tokenizer=tokenizer,
         data_args=data_args,
@@ -165,7 +174,7 @@ def eval_beir(
 if __name__ == "__main__":
     # INIT wandb run
 
-    parser = HfArgumentParser((PromptModelArguments, DataArguments, EncodingArguments))
+    parser = HfArgumentParser((PromptModelArguments, BEIRDataArguments, EncodingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, encoding_args = parser.parse_json_file(
             json_file=os.path.abspath(sys.argv[1])
@@ -173,6 +182,6 @@ if __name__ == "__main__":
     else:
         model_args, data_args, encoding_args = parser.parse_args_into_dataclasses()
         model_args: PromptModelArguments
-        data_args: DataArguments
+        data_args: BEIRDataArguments
         encoding_args: EncodingArguments
     eval_beir(data_args=data_args, model_args=model_args, encoding_args=encoding_args)
