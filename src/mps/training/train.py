@@ -39,7 +39,7 @@ from src.mps.models.prompt_tuning.prompt_tuning_model import (
     PromptModelArguments,
 )
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
-from src.mps.utils import construct_beir_training_dataset
+from src.mps.utils import construct_beir_dataset
 
 # from transformers.integrations import TensorBoardCallback
 from torch import Tensor, nn
@@ -131,9 +131,15 @@ def train():
     except:
         config = None
     if data_args.train_dataset is not None:
-        train_dir = construct_beir_training_dataset(data_args.train_dataset)
-        data_args.train_path = train_dir
-        # data_args.eval_path = pass # TODO set eval dataset
+        train_dir = construct_beir_dataset(
+            data_args.train_dataset, tokenizer=tokenizer, split="train"
+        )
+        data_args.train_path = os.path.join(train_dir, "om_train.jsonl")
+        if training_args.do_eval:
+            eval_dir = construct_beir_dataset(
+                data_args.train_dataset, tokenizer=tokenizer, split="dev"
+            )
+            data_args.eval_path = os.path.join(eval_dir, "om_dev.jsonl")
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name

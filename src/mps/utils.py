@@ -148,12 +148,12 @@ def process_one(query_dataset, corpus_dataset, q, poss):
     return train_example
 
 
-def construct_beir_training_dataset(dataset_name: str, tokenizer):
+def construct_beir_dataset(dataset_name: str, tokenizer, split: str = "train"):
     data_dir = download_dataset(dataset_name)
     validate_data_splits(data_dir)
     qrels_dir = os.path.join(data_dir, "qrels")
-    save_to = os.path.join(data_dir, "om_train.jsonl")
-    qrels_file = os.path.join(qrels_dir, "train.tsv")
+    save_to = os.path.join(data_dir, "om_{}jsonl".format(split))
+    qrels_file = os.path.join(qrels_dir, "{}.tsv".format(split))
     data_args = DataArguments(
         corpus_path=os.path.join(data_dir, "corpus.jsonl"),
         query_path=os.path.join(data_dir, "queries.jsonl"),
@@ -199,4 +199,4 @@ def construct_beir_training_dataset(dataset_name: str, tokenizer):
             if result is not None:
                 f.write(json.dumps(result))
                 f.write("\n")
-    return save_to
+    return save_dir
