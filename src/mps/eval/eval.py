@@ -3,7 +3,7 @@ import os
 import sys
 import wandb
 
-
+from dataclasses import asdict
 import pytrec_eval
 from openmatch.arguments import DataArguments
 from openmatch.arguments import InferenceArguments as EncodingArguments
@@ -30,7 +30,6 @@ def eval_beir(
     model_args: PromptModelArguments,
     data_args: BEIRDataArguments,
     encoding_args: EncodingArguments,
-    log_wandb=True,
 ):
 
     if os.path.exists(encoding_args.output_dir) and os.listdir(
@@ -170,8 +169,9 @@ def eval_beir(
             )
             output_dict = {}
             for args in [model_args, data_args, encoding_args]:
-                output_dict.update(args.to_dict())
-            output_dict.update(results)
+                output_dict.update(asdict(args))
+            wandb.config.update(output_dict)
+            wandb.log(results)
 
 
 if __name__ == "__main__":
