@@ -1,29 +1,25 @@
+import json
+import logging
 import os
-from torch.nn.functional import softmax
-import torch
-from dataclasses import dataclass, field, asdict
-
-from transformers import HfArgumentParser
-from src.mps.similarity.domain_similarity import DomainSimilarity
-from src.mps.eval.eval_beir import evaluate, EvaluationArguments
-from src.mps.datasets import DATASET_GROUPS
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from shutil import copytree
+from typing import Dict, Tuple, Union
 
 import numpy as np
-
-import json
-from typing import Dict, Union, Tuple
-
-from pathlib import Path
-
-from src.mps.utils import download_dataset, validate_data_splits
-
-from .eval_beir_openmatch import eval_beir
-
 import pandas as pd
+import torch
+from torch.nn.functional import softmax
+from transformers import HfArgumentParser
+
 import wandb
+from openmatch.arguments import InferenceArguments as EncodingArguments
+from src.mps.datasets import DATASET_GROUPS, DATASET_GROUPS_MAPPING
+from src.mps.similarity.domain_similarity import DomainSimilarity
+from src.mps.utils import BEIRDataArguments
+from src.mps.models.prompt_tuning.prompt_tuning_model import PromptModelArguments
 
-
-import logging
+from .eval import eval_beir
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -204,7 +200,6 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     # Copy one of the source models to the output directory
     source_model_path = artiface_dir
     # import copytree from shutil
-    from shutil import copytree
 
     copytree(source_model_path, output_dir)
     if isinstance(prompt_embeddings, tuple):
@@ -224,8 +219,15 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
         )
 
     # # Run the evaluation
-    # eval_args.model_name_or_path = output_dir
-    # eval(args=eval_args)
+    # Construct the evaluation arguments
+    model_args = PromptModelArguments(model_name_or_path=output_dir, pooling="mean")
+    data_args = BEIRDataArguments(
+        eval_dataset=eval_args.target_dataset,
+        doc_template="<title> [SEP] <text>",
+        query_template="<text>",
+    )
+    encoding_args = EncodingArguments()
+    eval_args(model_args=model_args, data_args=data_args, encoding_args=encoding_args)
 
 
 if __name__ == "__main__":
