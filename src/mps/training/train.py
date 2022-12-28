@@ -190,6 +190,7 @@ def train():
             wandb.run.id, type="model", description="trained model"
         )
         artifact.add_dir(training_args.output_dir)
+        wandb.log_artifact(artifact)
     if trainer.is_world_process_zero():
         tokenizer.save_pretrained(training_args.output_dir)
     # save model to wandb
