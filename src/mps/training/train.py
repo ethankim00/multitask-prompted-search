@@ -68,9 +68,11 @@ def train():
         data_args: DataArguments
         training_args: TrainingArguments
     import pdb
+
     pdb.set_trace()
     if os.getenv("WANDB_DISABLED") != "True":
         import wandb
+
         wandb.init(
             project="prompt_tuning_information_retrieval",
             entity="ir-transfer",
@@ -182,43 +184,15 @@ def train():
 
     trainer.train()
     trainer.save_model()
-
-    # save model to wandb
     if os.getenv("WANDB_DISABLED") != "True":
-        # save the passage model
-        if model_args.untie_encoder:
-            wandb.save(
-                os.path.join(training_args.output_dir, "passage_model/*"), policy="now"
-            )
-            wandb.save(
-                os.path.join(training_args.output_dir, "query_model/*"),
-                policy="now",
-            )
-        else:
-            wandb.save(
-                os.path.join(training_args.output_dir, "pytoch_model.bin"), policy="now"
-            )
-            wandb.save(
-                os.path.join(training_args.output_dir, "config.json"), policy="now"
-            )
-        wandb.save(
-            os.path.join(training_args.output_dir, "openmatch_config.json"), policy="now"
+        # Save the entire output directory as a wandb artifact
+        artifact = wandb.Artifact(
+            wandb.run.id, type="model", description="trained model"
         )
-        wandb.save(
-            os.path.join(training_args.output_dir, "training_args.bin"), policy="now"
-        )
-        wandb.save(
-            os.path.join(training_args.output_dir, "tokenizer_config.json"),
-            policy="now",
-        )
-        wandb.save(
-            os.path.join(training_args.output_dir, "special_tokens_map.json"),
-            policy="now",
-        )
-        wandb.save(os.path.join(training_args.output_dir, "vocab.txt"), policy="now")
-
+        artifact.add_dir(training_args.output_dir)
     if trainer.is_world_process_zero():
         tokenizer.save_pretrained(training_args.output_dir)
+    # save model to wandb
 
 
 if __name__ == "__main__":
