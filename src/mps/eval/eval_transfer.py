@@ -1,3 +1,4 @@
+import os
 from torch.nn.functional import softmax
 import torch
 from dataclasses import dataclass, field, asdict
@@ -10,11 +11,11 @@ from src.mps.datasets import DATASET_GROUPS
 import numpy as np
 
 import json
-from typing import Dict
+from typing import Dict, Union, Tuple
 
 from pathlib import Path
 
-from src.mps.utils import download_dataset, BeirDatasetArguments
+from src.mps.utils import download_dataset, validate_data_splits
 
 from .eval_beir_openmatch import eval_beir
 
@@ -81,19 +82,35 @@ def get_weights(scores, temperature: float = 1.0):
 
 
 def get_weighted_prompts(
-    weights: Dict[str, float], embeddings_dict: Dict[str, np.ndarray]
-) -> np.ndarray:
-
-    transfer_embeddings = np.zeros_like(list(embeddings_dict.values())[0])
-    for domain, weight in weights.items():
-        embeddings = embeddings_dict[domain]
-        transfer_embeddings += embeddings * weight
-    return transfer_embeddings
+    weights: Dict[str, float],
+    embeddings_dict: Union[
+        Dict[str, np.ndarray], Dict[str, Tuple[np.ndarray, np.ndarray]]
+    ],
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    # deal w/ untied embeddings where values in the embedding dict are tuples of query and passage embeddings
+    if isinstance(list(embeddings_dict.values())[0], tuple):
+        query_transfer_embeddings = np.zeros_like(list(embeddings_dict.values())[0][0])
+        passage_transfer_embeddings = np.zeros_like(
+            list(embeddings_dict.values())[0][1]
+        )
+        for domain, weight in weights.items():
+            query_embeddings, passage_embeddings = embeddings_dict[domain]
+            query_transfer_embeddings += query_embeddings * weight
+            passage_transfer_embeddings += passage_embeddings * weight
+        return query_transfer_embeddings, passage_transfer_embeddings
+    else:
+        transfer_embeddings = np.zeros_like(list(embeddings_dict.values())[0])
+        for domain, weight in weights.items():
+            embeddings = embeddings_dict[domain]
+            transfer_embeddings += embeddings * weight
+        return transfer_embeddings
 
 
 def load_wandb_embeddings(
     tag: str, project: str = "ir-transfer/prompt_tuning_information_retrieval"
 ) -> Dict[str, np.ndarray]:
+
+    api = wandb.Api()
     runs = api.runs(project)
     embedding_dict = {}
     for run in runs:
@@ -101,28 +118,56 @@ def load_wandb_embeddings(
             dataset = run.config["train_dataset"]
             run_path = project + "/" + run.id
             root_path = "./models/" + tag + dataset
-            embedding_path = wandb.restore(
-                "prompt_embeddings.npz", run_path=run_path, root=root_path
+
+            artifact_id = run.id
+            artifact = api.Artifact.get(artifact_id=artifact_id)
+            artifact_dir = artifact.download("./models/transfer/")
+            open_match_config = json.load(
+                open(Path(artifact_dir).joinpath("openmatch_config.json"), "r")
             )
-            embeddings = np.load(
-                open(Path(root_path).joinpath("prompt_embeddings.npz"), "rb")
-            )
-            embedding_dict[dataset] = embeddings
+            # Load embeddings on cuda if available else map location to cpu
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if open_match_config["tied"]:
+                embeddings = torch.load(
+                    open(Path(artifact_dir).joinpath("pytorch_model.bin"), "rb"),
+                    map_location=device,
+                )["soft_prompt_layer.soft_embeds"].numpy()
+                embedding_dict[dataset] = embeddings
+            else:
+                query_embeddings = torch.load(
+                    open(
+                        Path(artifact_dir)
+                        .joinpath("query_model")
+                        .joinpath("pytorch_model.bin"),
+                        "rb",
+                    ),
+                    map_location=device,
+                )["soft_prompt_layer.soft_embeds"].numpy()
+                passage_embeddings = torch.load(
+                    open(
+                        Path(artifact_dir)
+                        .joinpath("passage_model")
+                        .joinpath("pytorch_model.bin"),
+                        "rb",
+                    ),
+                    map_location=device,
+                )["soft_prompt_layer.soft_embeds"].numpy()
+                embedding_dict[dataset] = (query_embeddings, passage_embeddings)
     return embedding_dict
 
 
-def eval_transfer(eval_args: TransferEvaluationArguments, wandb_logging: bool = False):
+def eval_transfer(eval_args: TransferEvaluationArguments):
     logger.info("Running OOD transfer Experiment")
     source_datasets = DATASET_GROUPS[eval_args.source_dataset_group]
     runs = api.runs("ir-transfer/prompt_tuning_information_retrieval")
-    source_datatsets = [
+    source_datasets = [
         run.config["train_dataset"]
         for run in runs
         if eval_args.source_dataset_group in run.tags
     ]
     for dataset in source_datasets:
-        dataset_args = BeirDatasetArguments(dataset=dataset, data_dir="./data")
-    data_path = download_dataset(dataset_args)
+        data_path = download_dataset(dataset)
+        validate_data_splits(data_path)
     logger.info(
         "Using {} source datasets from {}".format(
             len(source_datasets), eval_args.source_dataset_group
@@ -145,49 +190,56 @@ def eval_transfer(eval_args: TransferEvaluationArguments, wandb_logging: bool = 
         eval_args.target_dataset, k=eval_args.top_k
     )
     weights = get_weights(scores, temperature=eval_args.temperature)
-    if wandb_logging:
+    if os.getenv("WANDB_DISABLED") != "True":
         wandb.log({"weights": weights})
     prompt_embeddings = get_weighted_prompts(weights, embedding_dict)
-    output_dir = Path("./models/trained_models").joinpath(
+    output_dir = Path("./models/").joinpath(
         eval_args.source_dataset_group
         + eval_args.similarity_method
         + eval_args.target_dataset
-        # + eval_args.temperature
-        # + str(eval_args.top_k)
+        + str(eval_args.temperature)
+        + str(eval_args.top_k)
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    embedding_output_path = output_dir.joinpath("prompt_embeddings.npz")
-    config_dict = asdict(eval_args)
-    sample_run = [run for run in runs if eval_args.source_model_path in run.tags][0]
-    config_dict.update({"model_name_or_path": eval_args.model_name_or_path})
-    config_output_path = output_dir.joinpath("config.json")
-    config_dict.update(sample_run.config)
-    json.dump(config_dict, open(str(config_output_path), "w"))
-    np.save(
-        open(str(embedding_output_path), "wb"), prompt_embeddings
-    )  # Save averaged prompts to file for eval script to load
-    eval_script_args = EvaluationArguments(
-        model_name_or_path=str(output_dir),
-        dataset=eval_args.target_dataset,
-        split="test",
-    )
-    evaluate(eval_script_args, wandb_logging=wandb_logging)
+    # Copy one of the source models to the output directory
+    source_model_path = artiface_dir
+    # import copytree from shutil
+    from shutil import copytree
+
+    copytree(source_model_path, output_dir)
+    if isinstance(prompt_embeddings, tuple):
+        query_embeddings, passage_embeddings = prompt_embeddings
+        torch.save(
+            {"soft_prompt_layer.soft_embeds": torch.from_numpy(query_embeddings)},
+            output_dir.joinpath("query_model").joinpath("pytorch_model.bin"),
+        )
+        torch.save(
+            {"soft_prompt_layer.soft_embeds": torch.from_numpy(passage_embeddings)},
+            output_dir.joinpath("passage_model").joinpath("pytorch_model.bin"),
+        )
+    else:
+        torch.save(
+            {"soft_prompt_layer.soft_embeds": torch.from_numpy(prompt_embeddings)},
+            output_dir.joinpath("pytorch_model.bin"),
+        )
+
+    # # Run the evaluation
+    # eval_args.model_name_or_path = output_dir
+    # eval(args=eval_args)
 
 
 if __name__ == "__main__":
     api = wandb.Api()
     parser = HfArgumentParser(TransferEvaluationArguments)
     eval_args = parser.parse_args_into_dataclasses()[0]
-    # try:
-    import wandb
+    # Conditional wandb logging
+    if os.getenv("WANDB_DISABLED") != "True":
+        import wandb
 
-    wandb.init(
-        project="prompt_tuning_information_retrieval",
-        entity="ir-transfer",
-        tags=["transfer_eval", eval_args.source_dataset_group + "transfer"],
-    )
-    wandb_logging = True
-    # except:
-    #     pass
-    wandb.config.update(asdict(eval_args))
-    eval_transfer(eval_args, wandb_logging=wandb_logging)
+        wandb.init(
+            project="prompt_tuning_information_retrieval",
+            entity="ir-transfer",
+            tags=["transfer_eval", eval_args.source_dataset_group + "transfer"],
+        )
+        wandb.config.update(asdict(eval_args))
+    eval_transfer(eval_args)
