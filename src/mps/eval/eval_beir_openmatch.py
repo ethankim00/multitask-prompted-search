@@ -3,6 +3,8 @@ import os
 import sys
 import wandb
 
+
+
 from dataclasses import asdict
 import pytrec_eval
 from openmatch.arguments import DataArguments
@@ -30,6 +32,7 @@ def eval_beir(
     model_args: PromptModelArguments,
     data_args: BEIRDataArguments,
     encoding_args: EncodingArguments,
+    log_wandb=True,
 ):
 
     if os.path.exists(encoding_args.output_dir) and os.listdir(
@@ -161,7 +164,7 @@ def eval_beir(
                 value,
             )
             results["measure"] = value
-        if os.getenv("WANDB_DISABLED") != "True":
+        if os.getenv("WANDB_DISABLED"):
             wandb.init(
                 project="prompt_tuning_information_retrieval",
                 entity="ir-transfer",
@@ -170,8 +173,8 @@ def eval_beir(
             output_dict = {}
             for args in [model_args, data_args, encoding_args]:
                 output_dict.update(asdict(args))
-            wandb.config.update(output_dict)
-            wandb.log(results)
+            output_dict.update(results)
+            wandb.log(output_dict)
 
 
 if __name__ == "__main__":

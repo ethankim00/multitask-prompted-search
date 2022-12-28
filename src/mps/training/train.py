@@ -67,18 +67,19 @@ def train():
         model_args: ModelArguments
         data_args: DataArguments
         training_args: TrainingArguments
-
-    if not os.getenv("WANDB_DISABLED"):
+    import pdb
+    pdb.set_trace()
+    if os.getenv("WANDB_DISABLED") != "True":
         import wandb
-
         wandb.init(
             project="prompt_tuning_information_retrieval",
             entity="ir-transfer",
-            tags=["train", "beir_expand"],
+            tags=["train"],
         )
         training_args.report_to = ["wandb"]
         model_params = asdict(training_args)
         model_params.update(asdict(model_args))
+        model_params.update(asdict(data_args))
         wandb.config.update(model_params)
     if (
         os.path.exists(training_args.output_dir)
@@ -183,9 +184,9 @@ def train():
     trainer.save_model()
 
     # save model to wandb
-    if not os.getenv("WANDB_DISABLED"):
+    if os.getenv("WANDB_DISABLED") != "True":
         # save the passage model
-        if not model_args.tied:
+        if model_args.untie_encoder:
             wandb.save(
                 os.path.join(training_args.output_dir, "passage_model/*"), policy="now"
             )
@@ -200,6 +201,9 @@ def train():
             wandb.save(
                 os.path.join(training_args.output_dir, "config.json"), policy="now"
             )
+        wandb.save(
+            os.path.join(training_args.output_dir, "openmatch_config.json"), policy="now"
+        )
         wandb.save(
             os.path.join(training_args.output_dir, "training_args.bin"), policy="now"
         )
