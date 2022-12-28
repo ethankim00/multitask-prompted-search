@@ -40,6 +40,7 @@ from src.mps.models.prompt_tuning.prompt_tuning_model import (
 )
 from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
 from src.mps.utils import construct_beir_dataset, BEIRDataArguments
+from src.mps.datasets import DATASET_GROUPS_MAPPING
 
 # from transformers.integrations import TensorBoardCallback
 from torch import Tensor, nn
@@ -67,16 +68,16 @@ def train():
         model_args: ModelArguments
         data_args: DataArguments
         training_args: TrainingArguments
-    import pdb
-
-    pdb.set_trace()
     if os.getenv("WANDB_DISABLED") != "True":
         import wandb
-
+        
+        tags = ["train"]
+        if data_args.train_dataset is not None:
+            tags += DATASET_GROUPS_MAPPING[data_args.train_dataset]
         wandb.init(
             project="prompt_tuning_information_retrieval",
             entity="ir-transfer",
-            tags=["train"],
+            tags=tags,
         )
         training_args.report_to = ["wandb"]
         model_params = asdict(training_args)
