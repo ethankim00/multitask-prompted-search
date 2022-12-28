@@ -249,8 +249,9 @@ DATASET_GROUPS = {
     "beir_expand": BEIR_DATASETS_WO_CQA + CQA_DATASETS,
 }
 
-# invert the Datset gropups dictionary
 DATASET_GROUPS_MAPPING = {}
 for k, v in DATASET_GROUPS.items():
-    for v_ in v:
-        DATASET_GROUPS_MAPPING[v_] = k
+    for dataset in v:
+        if dataset not in DATASET_GROUPS_MAPPING:
+            DATASET_GROUPS_MAPPING[dataset] = []
+        DATASET_GROUPS_MAPPING[dataset].append(k)
