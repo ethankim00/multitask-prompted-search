@@ -16,7 +16,7 @@ import wandb
 from openmatch.arguments import InferenceArguments as EncodingArguments
 from src.mps.datasets import DATASET_GROUPS, DATASET_GROUPS_MAPPING
 from src.mps.similarity.domain_similarity import DomainSimilarity
-from src.mps.utils import BEIRDataArguments
+from src.mps.utils import BEIRDataArguments, download_dataset, validate_data_splits
 from src.mps.models.prompt_tuning.prompt_tuning_model import PromptModelArguments
 
 from .eval import eval_beir
@@ -112,16 +112,12 @@ def load_wandb_embeddings(
     for run in runs:
         if tag in run.tags:
             dataset = run.config["train_dataset"]
-            run_path = project + "/" + run.id
-            root_path = "./models/" + tag + dataset
-
             artifact_id = run.id
             artifact = api.Artifact.get(artifact_id=artifact_id)
             artifact_dir = artifact.download("./models/transfer/")
             open_match_config = json.load(
                 open(Path(artifact_dir).joinpath("openmatch_config.json"), "r")
             )
-            # Load embeddings on cuda if available else map location to cpu
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             if open_match_config["tied"]:
                 embeddings = torch.load(
@@ -197,9 +193,7 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
         + str(eval_args.top_k)
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    # Copy one of the source models to the output directory
-    source_model_path = artiface_dir
-    # import copytree from shutil
+    source_model_path = artifact_dir
 
     copytree(source_model_path, output_dir)
     if isinstance(prompt_embeddings, tuple):
