@@ -115,9 +115,9 @@ def group_top_level_oag_topics(dataset: str) -> str:
         qrels = []
         for dataset in lower_level_datasets:
             data_dir=Path("./data").joinpath("beir_{}".format(dataset))
-            df = pd.read_csv(f"{data_dir}/qrels/{split}.tsv", sep="\t", header=None)
-            df[0] = df[0].apply(lambda x: f"{dataset}_{x}")
-            df[1] = df[1].apply(lambda x: f"{dataset}_{x}")
+            df = pd.read_csv(f"{data_dir}/qrels/{split}.tsv", sep="\t")
+            df["query-id"] = df["query-id"].apply(lambda x: f"{dataset}_{x}")
+            df["corpus-id"] = df["corpus-id"].apply(lambda x: f"{dataset}_{x}")
             qrels.append(df)
         qrels = pd.concat(qrels)
         return qrels
@@ -128,9 +128,9 @@ def group_top_level_oag_topics(dataset: str) -> str:
     os.makedirs(output_dir, exist_ok=True)
     qrels_dir = Path(output_dir).joinpath("qrels")
     os.makedirs(qrels_dir, exist_ok=True)
-    train_qrels.to_csv(f"{output_dir}/qrels/train.tsv", sep="\t", header=False, index=False)
-    dev_qrels.to_csv(f"{output_dir}/qrels/dev.tsv", sep="\t", header=False, index=False)
-    test_qrels.to_csv(f"{output_dir}/qrels/test.tsv", sep="\t", header=False, index=False)
+    train_qrels.to_csv(f"{output_dir}/qrels/train.tsv", sep="\t", index=False)
+    dev_qrels.to_csv(f"{output_dir}/qrels/dev.tsv", sep="\t",index=False)
+    test_qrels.to_csv(f"{output_dir}/qrels/test.tsv", sep="\t", index=False)
     # WRite query and corpus entries to jsonl format
     with open(f"{output_dir}/corpus.jsonl", "w") as f:
         for doc in corpus:
