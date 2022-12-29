@@ -121,6 +121,8 @@ class OAGBeirConverter:
         if dataset_folder.joinpath("corpus.jsonl").is_file():
             logger.info("Dataset already converted")
             return dataset_folder
+        else:
+            dataset_folder.mkdir(parents=True, exist_ok=True)
         oag_data = self._load_all_files(topic_name=dataset)
         beir_corpus = self.convert_oag_beir_corpus(oag_data["corpus"])
         beir_queries = extract_queries(oag_data["queries"])

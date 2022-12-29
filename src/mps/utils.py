@@ -99,17 +99,23 @@ def group_top_level_oag_topics(dataset: str) -> str:
     def load_corpus_and_queries(lower_level_datasets: List[str]) -> List[Dict]:
         corpus = []
         queries = []
+        _data_dir = "./data"
         for dataset in lower_level_datasets:
-            with open(f"./data/oag_qa/{dataset}/corpus.json") as f:
-                corpus.extend([{**doc, "_id": f"{dataset}_{doc['_id']}"} for doc in json.load(f)])
-            with open(f"./data/oag_qa/{dataset}/queries.json") as f:
-                queries.extend([{**query, "_id": f"{dataset}_{query['_id']}"} for query in json.load(f)])
+            converter = OAGBeirConverter(
+                data_dir=Path(_data_dir).joinpath("oag_qa")
+            )
+            data_dir = converter.convert(dataset,)
+            with open(f"{data_dir}/corpus.jsonl") as f:
+                corpus.extend([{**doc, "_id": f"{dataset}_{doc['_id']}"} for doc in [json.loads(l) for l in f]])
+            with open(f"{data_dir}/queries.jsonl") as f:
+                queries.extend([{**query, "_id": f"{dataset}_{query['_id']}"} for query in [json.loads(l) for l in f]])
         return corpus, queries
     corpus, queries = load_corpus_and_queries(lower_level_topics)
     def load_qrels(lower_level_datasets: List[str], split: str = "train") -> pd.DataFrame:
         qrels = []
         for dataset in lower_level_datasets:
-            df = pd.read_csv(f"./data/oag_qa/{dataset}/qrels/{split}.tsv", sep="\t", header=None)
+            data_dir=Path("./data").joinpath("beir_{}".format(dataset))
+            df = pd.read_csv(f"{data_dir}/qrels/{split}.tsv", sep="\t", header=None)
             df[0] = df[0].apply(lambda x: f"{dataset}_{x}")
             df[1] = df[1].apply(lambda x: f"{dataset}_{x}")
             qrels.append(df)
@@ -118,8 +124,10 @@ def group_top_level_oag_topics(dataset: str) -> str:
     train_qrels = load_qrels(lower_level_topics, "train")
     dev_qrels = load_qrels(lower_level_topics, "dev")
     test_qrels = load_qrels(lower_level_topics, "test")
-    output_dir = f"./data/oag_qa/{dataset}"
+    output_dir = f"./data/oag_qa_top_level/{dataset}"
     os.makedirs(output_dir, exist_ok=True)
+    qrels_dir = Path(output_dir).joinpath("qrels")
+    os.makedirs(qrels_dir, exist_ok=True)
     train_qrels.to_csv(f"{output_dir}/qrels/train.tsv", sep="\t", header=False, index=False)
     dev_qrels.to_csv(f"{output_dir}/qrels/dev.tsv", sep="\t", header=False, index=False)
     test_qrels.to_csv(f"{output_dir}/qrels/test.tsv", sep="\t", header=False, index=False)
@@ -154,11 +162,7 @@ def download_dataset(dataset: str) -> str:
         data_dir = download_and_unzip(url, out_dir)
         data_dir = data_dir + "/" + dataset
     elif dataset in TOP_LEVEL_OAG_DATASETS:
-    #     pass
-    # TODO logic for top level oag topics
-    # Convert all lower level datasets
-    # Compbine in a single directory, concatenative files and adjusting index mappings
-    # 1 load
+        data_dir = group_top_level_oag_topics(dataset)
     return data_dir
 
 
