@@ -136,6 +136,7 @@ def train():
             data_args.train_dataset, tokenizer=tokenizer, split="train"
         )
         data_args.train_path = os.path.join(train_dir, "om_train.jsonl")
+        training_args.output_dir = os.path.join("models", data_args.train_dataset)
         if training_args.do_eval:
             eval_dir = construct_beir_dataset(
                 data_args.train_dataset, tokenizer=tokenizer, split="dev"
