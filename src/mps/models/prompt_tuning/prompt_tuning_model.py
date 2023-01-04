@@ -13,9 +13,9 @@ from torch import nn, Tensor
 import numpy as np
 import importlib
 import json
+from sklearn.metrics.pairwise import cosine_similarity
 
-
-from typing import Optional, Dict
+from typing import Optional, Dict, Union, Tuple, List
 from dataclasses import dataclass, field
 
 from src.mps.models.utils import HFModelArguments
@@ -141,12 +141,102 @@ class PromptDRModel(DRModel):
             json.dump(self._get_config_dict(), f, indent=4)
         if not os.getenv("WANDB_DISABLED"):
             import wandb
+
             logger.info("Uploading Checkpoint to Wandb")
             if not self.tied:
-                wandb.save(os.path.join(output_dir, "query_model/*"), base_path="./", policy = "now")
-                wandb.save(os.path.join(output_dir, "passage_model/*"), base_path="./", policy = "now")
+                wandb.save(
+                    os.path.join(output_dir, "query_model/*"),
+                    base_path="./",
+                    policy="now",
+                )
+                wandb.save(
+                    os.path.join(output_dir, "passage_model/*"),
+                    base_path="./",
+                    policy="now",
+                )
+                query_vocab = self.get_nearest_neighbor_vocabulary()
+                passage_vocab = self.get_nearest_neighbor_vocabulary()
+                table = wandb.Table(
+                    columns=[
+                        "soft_prompt_token_nearest_neighbors_query",
+                        "soft_prompt_token_nearest_neighbors_passage",
+                    ]
+                )
+                for i in range(len(query_vocab)):
+                    table.add_data(query_vocab[i], passage_vocab[i])
+                wandb.log({"soft_prompt_token_nearest_neighbors": table})
             else:
-                wandb.save(os.path.join(output_dir, "query_model/*"), base_path="./", policy = "now")
+                wandb.save(
+                    os.path.join(output_dir, "query_model/*"),
+                    base_path="./",
+                    policy="now",
+                )
+                query_vocab = self.get_nearest_neighbor_vocabulary()
+                table = wandb.Table(columns=["soft_prompt_token_nearest_neighbors"])
+                for i in range(len(query_vocab)):
+                    table.add_data(query_vocab[i])
+                wandb.log({"soft_prompt_token_nearest_neighbors": table})
+
+    def get_soft_token_parameters(
+        self,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        if self.tied:
+            passage_embeddings = self.lm_p.get_submodule(
+                target="0.soft_prompt_layer"
+            ).state_dict()["soft_embeds"]
+            return passage_embeddings
+        else:
+            query_embeddings = self.lm_q.get_submodule(
+                target="0.soft_prompt_layer"
+            ).state_dict()["soft_embeds"]
+            passage_embeddings = self.lm_p.get_submodule(
+                target="0.soft_prompt_layer"
+            ).state_dict()["soft_embeds"]
+            return query_embeddings, passage_embeddings
+
+    def get_nearest_neighbor_vocabulary(self, top_k: int = 20) -> List[str]:
+        if self.tied:
+            passage_embeddings = self.get_soft_token_parameters()
+            passage_word_embeddings = (
+                list(self.lm_p.modules())[2]
+                .state_dict()["word_embeddings.weight"]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            passage_embeddings = passage_embeddings.detach().cpu().numpy()
+            similarities = cosine_similarity(
+                passage_word_embeddings, passage_embeddings
+            )
+            top = np.argsort(similarities, axis=0)[-top_k:, :]
+            return tokenizer.batch_decode(top.T)
+        else:
+            query_embeddings, passage_embeddings = self.get_soft_token_parameters()
+            passage_word_embeddings = (
+                list(self.lm_p.modules())[2]
+                .state_dict()["word_embeddings.weight"]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            query_word_embeddings = (
+                list(self.lm_q.modules())[2]
+                .state_dict()["word_embeddings.weight"]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            query_similarities = cosine_similarity(
+                query_word_embeddings, query_embeddings
+            )
+            passage_similarities = cosine_similarity(
+                passage_word_embeddings, passage_embeddings
+            )
+            top_query = np.argsort(query_similarities, axis=0)[-top_k:, :]
+            top_passage = np.argsort(passage_similarities, axis=0)[-top_k:, :]
+            return self.tokenizer.batch_decode(
+                top_query.T
+            ), self.tokenizer.batch_decode(top_passage.T)
 
     def encode(self, items, model, head):
         if items is None:
