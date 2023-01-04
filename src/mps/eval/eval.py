@@ -162,10 +162,12 @@ def eval_beir(
             )
             results["measure"] = value
         if os.getenv("WANDB_DISABLED") != "True":
+            tags = ["eval"]
+            tags += DATASET_GROUPS_MAPPING[data_args.eval_dataset]
             wandb.init(
                 project="prompt_tuning_information_retrieval",
                 entity="ir-transfer",
-                tags=["eval", DATASET_GROUPS_MAPPING[data_args.eval_dataset]],
+                tags= tags,
             )
             output_dict = {}
             for args in [model_args, data_args, encoding_args]:
