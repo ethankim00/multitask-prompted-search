@@ -181,46 +181,44 @@ class PromptDRModel(DRModel):
         self,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         if self.tied:
-            passage_embeddings = self.lm_p.get_submodule(
+            query_embeddings = self.q_delta_model.get_submodule(
                 target="0.soft_prompt_layer"
             ).state_dict()["soft_embeds"]
-            return passage_embeddings
+            return query_embeddings
         else:
-            query_embeddings = self.lm_q.get_submodule(
+            query_embeddings = self.q_delta_model.get_submodule(
                 target="0.soft_prompt_layer"
             ).state_dict()["soft_embeds"]
-            passage_embeddings = self.lm_p.get_submodule(
+            passage_embeddings = self.p_delta_model.get_submodule(
                 target="0.soft_prompt_layer"
             ).state_dict()["soft_embeds"]
             return query_embeddings, passage_embeddings
 
     def get_nearest_neighbor_vocabulary(self, top_k: int = 20) -> List[str]:
         if self.tied:
-            passage_embeddings = self.get_soft_token_parameters()
-            passage_word_embeddings = (
-                list(self.lm_p.modules())[2]
+            query_embeddings = self.get_soft_token_parameters()
+            query_word_embeddings = (
+                list(self.q_delta_model.modules())[2]
                 .state_dict()["word_embeddings.weight"]
                 .detach()
                 .cpu()
                 .numpy()
             )
-            passage_embeddings = passage_embeddings.detach().cpu().numpy()
-            similarities = cosine_similarity(
-                passage_word_embeddings, passage_embeddings
-            )
+            query_embeddings = query_embeddings.detach().cpu().numpy()
+            similarities = cosine_similarity(query_word_embeddings, query_embeddings)
             top = np.argsort(similarities, axis=0)[-top_k:, :]
-            return tokenizer.batch_decode(top.T)
+            return self.tokenizer.batch_decode(top.T)
         else:
             query_embeddings, passage_embeddings = self.get_soft_token_parameters()
             passage_word_embeddings = (
-                list(self.lm_p.modules())[2]
+                list(self.p_delta_model.modules())[2]
                 .state_dict()["word_embeddings.weight"]
                 .detach()
                 .cpu()
                 .numpy()
             )
             query_word_embeddings = (
-                list(self.lm_q.modules())[2]
+                list(self.q_delta_model.modules())[2]
                 .state_dict()["word_embeddings.weight"]
                 .detach()
                 .cpu()
