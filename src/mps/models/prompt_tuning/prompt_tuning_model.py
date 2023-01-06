@@ -166,6 +166,7 @@ class PromptDRModel(DRModel):
                     table.add_data(query_vocab[i], passage_vocab[i])
                 wandb.log({"soft_prompt_token_nearest_neighbors": table})
             else:
+
                 wandb.save(
                     os.path.join(output_dir, "query_model/*"),
                     base_path="./",
@@ -198,9 +199,7 @@ class PromptDRModel(DRModel):
         if self.tied:
             query_embeddings = self.get_soft_token_parameters()
             query_word_embeddings = (
-                list(self.q_delta_model.modules())[2]
-                .state_dict()["word_embeddings.weight"]
-                .detach()
+                self.lm_q.base_model.embeddings.word_embeddings.weight.detach()
                 .cpu()
                 .numpy()
             )
@@ -211,16 +210,12 @@ class PromptDRModel(DRModel):
         else:
             query_embeddings, passage_embeddings = self.get_soft_token_parameters()
             passage_word_embeddings = (
-                list(self.p_delta_model.modules())[2]
-                .state_dict()["word_embeddings.weight"]
-                .detach()
+                self.lm_p.base_model.embeddings.word_embeddings.weight.detach()
                 .cpu()
                 .numpy()
             )
             query_word_embeddings = (
-                list(self.q_delta_model.modules())[2]
-                .state_dict()["word_embeddings.weight"]
-                .detach()
+                self.lm_q.base_model.embeddings.word_embeddings.weight.detach()
                 .cpu()
                 .numpy()
             )
