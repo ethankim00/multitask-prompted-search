@@ -3,9 +3,17 @@
 ## Install Requirements
 
 ```
-conda install -c pytorch faiss-gpu cudatoolkit=11.0
-conda install -c conda-forge cudatoolkit=11.0.3
-conda install pytorch pytorch-cuda=11.7 -c pytorch -c nvidia
+conda create -n prompt python=3.9
+conda activate prompt
+conda install pytorch==1.12.1 cudatoolkit=11.4 pytorch transformers faiss-gpu -c conda-forge
+pip install -r requirements.txt 
+pip install sentence-transformers --no-dependencies
+pip install nltk
+pip install -U scikit-learn --no-dependencies
+pip install -U threadpoolctl --no-dependencies
+pip install -U PIL --no-dependencies
+pip install -U Pillow--no-dependencies
+pip install -U Pillow --no-dependencies
 ```
 
 Install Openmatch
@@ -54,6 +62,8 @@ python -m torch.distributed.launch --nproc_per_node=8
 --overwrite_output_dir True 
 --save_steps 1000 \
 --per_device_train_batch_size 16 \
+--learning_rate 1e-3 \
+--num_train_epochs 40 \
 ```
 
 
