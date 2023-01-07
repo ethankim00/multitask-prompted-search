@@ -182,17 +182,11 @@ class PromptDRModel(DRModel):
         self,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         if self.tied:
-            query_embeddings = self.q_delta_model.get_submodule(
-                target="0.soft_prompt_layer"
-            ).state_dict()["soft_embeds"]
+            query_embeddings = self.q_delta_model.state_dict()["delta_modules.0.soft_embeds"].detach().cpu().numpy()
             return query_embeddings
         else:
-            query_embeddings = self.q_delta_model.get_submodule(
-                target="0.soft_prompt_layer"
-            ).state_dict()["soft_embeds"]
-            passage_embeddings = self.p_delta_model.get_submodule(
-                target="0.soft_prompt_layer"
-            ).state_dict()["soft_embeds"]
+            query_embeddings = self.q_delta_model.state_dict()["delta_modules.0.soft_embeds"].detach().cpu().numpy()
+            passage_embeddings = self.p_delta_model.state_dict()["delta_modules.0.soft_embeds"].detach().cpu().numpy()
             return query_embeddings, passage_embeddings
 
     def get_nearest_neighbor_vocabulary(self, top_k: int = 20) -> List[str]:
