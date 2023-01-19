@@ -149,6 +149,7 @@ def train():
         config=config,
         cache_dir=model_args.cache_dir,
     )
+    model.tokenizer = tokenizer
     TrainDatasetClass = (
         MappingDRTrainDataset
         if training_args.use_mapping_dataset
