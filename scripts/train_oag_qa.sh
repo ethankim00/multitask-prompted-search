@@ -10,11 +10,10 @@ POOLING=mean
 NORMALIZE=True
 OVERWRITE_OUTPUT_DIR=True
 CUDA_AVAILABLE_DEVICES=0,1,2,3,4,5,6,7
-NUM_TRAIN_EPOCHS=40
+NUM_TRAIN_EPOCHS=100
 PER_DEVICE_TRAIN_BATCH_SIZE=16\
 LEARNING_RATE=3e-3
-
-for train_dataset in fiqa arguana touche nq hotpotqa msmarco trec-covid nfcorpus quora dbpedia scidocs fever climate-fever scifact android english gaming gis mathematica physics programmers stats tex unix webmasters wordpress
+for train_dataset in GEOMETRY STATISTICS ALGEBRA CALCULUS NUMBER_THEORY LINEAR_ALGEBRA ASTROPHYSICS QUANTUM_MECHANICS PHYSICS CHEMISTRY BIOCHEMISTRY HEALTH_CARE NATURAL_SCIENCE PSYCHOLOGY ALGORITHM NEURAL_NETWORK COMPUTER_VISION DATA_MINING DEEP_LEARNING MACHINE_LEARNING NLP ECONOMICS
 do
     python -m torch.distributed.launch --nproc_per_node=8
         --model_name_or_path $MODEL_NAME_OR_PATH \

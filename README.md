@@ -64,9 +64,28 @@ python -m torch.distributed.launch --nproc_per_node=8
 --per_device_train_batch_size 16 \
 --learning_rate 1e-3 \
 --num_train_epochs 40 \
+--negatives_x_device True \
 ```
 
 
 ## Train Dense Encoders for Each Domain 
 
+### BEIR Datasets
+Run the script to train the dense encoder for each publicly available BEIR dataset. Note the subcategories of the CQADupStack dataset are not treated as separate datasets. 
+
+```
+sh scripts/train_beir.sh
+```
+
+### OAG QA Datasets 
+
+#### Download OAG-QA Data
+
+Download OAG-QA from the link: OAG-QA, and unzip it to ./data/oag_qa 
+
+Run the script to train the dense encoder for each OAG-QA dataset
+
+```
+sh scripts/train_oag_qa.sh
+```
 
