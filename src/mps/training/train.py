@@ -70,7 +70,7 @@ def train():
         training_args: TrainingArguments
     if os.getenv("WANDB_DISABLED") != "True":
         import wandb
-        
+
         tags = ["train"]
         if data_args.train_dataset is not None:
             tags += DATASET_GROUPS_MAPPING[data_args.train_dataset]
