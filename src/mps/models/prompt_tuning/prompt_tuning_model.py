@@ -241,6 +241,8 @@ class PromptDRModel(DRModel):
         else:
             items_out = model(**items, return_dict=True)
             hidden = getattr(items_out, self.feature)
+            if self.feature == "pooler_output":
+                return hidden, hidden
             if self.pooling == "first":
                 reps = hidden[:, 0, :]
             elif self.pooling == "mean":
@@ -285,6 +287,7 @@ class PromptDRModel(DRModel):
             lm,
             local_files_only=True,
         )
+        del lm.embeddings.token_type_ids
         return lm, delta_model
 
     @classmethod
@@ -325,7 +328,13 @@ class PromptDRModel(DRModel):
                 lm_p, p_delta_model = cls._load_delta_model(
                     model_args, model_type="passage_model"
                 )
-
+                if model_args.freeze_plm:
+                    p_delta_model.freeze_module(
+                        exclude=["deltas"], set_state_dict=True
+                    )
+                    q_delta_model.freeze_module(
+                        exclude=["deltas"], set_state_dict=True
+                    )
                 if config["linear_head"]:
                     head_q = LinearHead.load(_qry_head_path)
                     head_p = LinearHead.load(_psg_head_path)
