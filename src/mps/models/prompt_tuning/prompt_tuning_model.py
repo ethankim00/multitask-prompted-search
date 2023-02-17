@@ -33,6 +33,7 @@ from openmatch.arguments import ModelArguments
 
 
 from opendelta import SoftPromptModel
+from opendelta import AutoDeltaModel
 from typing import Dict, Optional
 
 import torch
@@ -172,11 +173,11 @@ class PromptDRModel(DRModel):
                     base_path="./",
                     policy="now",
                 )
-                query_vocab = self.get_nearest_neighbor_vocabulary()
-                table = wandb.Table(columns=["soft_prompt_token_nearest_neighbors"])
-                for i in range(len(query_vocab)):
-                    table.add_data(query_vocab[i])
-                wandb.log({"soft_prompt_token_nearest_neighbors": table})
+                # query_vocab = self.get_nearest_neighbor_vocabulary()
+                # table = wandb.Table(columns=["soft_prompt_token_nearest_neighbors"])
+                # for i in range(len(query_vocab)):
+                #     table.add_data(query_vocab[i])
+                # wandb.log({"soft_prompt_token_nearest_neighbors": table})
 
     def get_soft_token_parameters(
         self,
@@ -193,11 +194,11 @@ class PromptDRModel(DRModel):
         if self.tied:
             query_embeddings = self.get_soft_token_parameters()
             query_word_embeddings = (
-                self.lm_q.base_model.embeddings.word_embeddings.weight.detach()
-                .cpu()
-                .numpy()
+                self.lm_q.base_model.embeddings.word_embeddings.weight#.detach()
+                # .cpu()
+                # .numpy()
             )
-            query_embeddings = query_embeddings.detach().cpu().numpy()
+            #query_embeddings = query_embeddings.detach().cpu().numpy()
             similarities = cosine_similarity(query_word_embeddings, query_embeddings)
             top = np.argsort(similarities, axis=0)[-top_k:, :]
             return self.tokenizer.batch_decode(top.T)
@@ -277,12 +278,12 @@ class PromptDRModel(DRModel):
             model_name, **hf_kwargs
         )  # TODO: have to fix if we ever train a non backbone model
         lm.soft_prompt_token_number = model_args.soft_prompt_token_number
-        delta_model = SoftPromptModel(
-            lm,
-            token_init=model_args.init_from_vocab,
-            soft_token_num=model_args.soft_prompt_token_number,
-        )
-        delta_model.from_finetuned(
+        # delta_model = SoftPromptModel(
+        #     lm,
+        #     token_init=model_args.init_from_vocab,
+        #     soft_token_num=model_args.soft_prompt_token_number,
+        # )
+        delta_model =  AutoDeltaModel.from_finetuned(
             os.path.join(model_args.model_name_or_path, model_type),
             lm,
             local_files_only=True,
@@ -321,6 +322,10 @@ class PromptDRModel(DRModel):
                 lm_p, p_delta_model = lm_q, q_delta_model
                 if config["linear_head"]:
                     head_q = head_p = LinearHead.load(model_args.model_name_or_path)
+                if model_args.freeze_plm:
+                    q_delta_model.freeze_module(
+                        exclude=["deltas"], set_state_dict=True
+                    )
             else:
                 lm_q, q_delta_model = cls._load_delta_model(
                     model_args, model_type="query_model"
@@ -402,7 +407,7 @@ class PromptDRModel(DRModel):
 class PromptDRInferenceModel(PromptDRModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.eval()
+        self.eval()
 
     @torch.no_grad()
     def encode_passage(self, psg):
