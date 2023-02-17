@@ -99,8 +99,6 @@ def eval_beir(
         cache_dir=model_args.cache_dir,
     )
 
-    retriever = Retriever.build_all(model, beir_dataset.corpus_dataset, encoding_args)
-
     if encoding_args.use_split_search:
         retriever = Retriever.build_embeddings(
             model, beir_dataset.corpus_dataset, encoding_args
@@ -127,7 +125,7 @@ def eval_beir(
 
         # compute metric
         evaluator = pytrec_eval.RelevanceEvaluator(
-            beir_dataset.qrels["test"], {"ndcg_cut.10"}
+            beir_dataset.qrels["test"], pytrec_eval.supported_measures
         )
         eval_results = evaluator.evaluate(run)
 
