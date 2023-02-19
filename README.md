@@ -49,22 +49,22 @@ sh scripts/process_pretraining_data.sh
 Train on the multitask mixture of 4 datasets from the DPR paper. Follow the recommended hyperparameters and train for 40 epochs with bs = 128
 
 ```
-python -m torch.distributed.launch --nproc_per_node=8
+python -m src.mps.training.train 
 --model_name_or_path bert-base-uncased \
---train_n_passages 1 \
+--train_n_passages 2 \
 --output_dir ./models/base_model \
+--use_mapping_dataset False \
 --report_to wandb \
 --use_delta True \
 --untie_encoder True \
 --pooling mean \
---normalize True\
+--normalize True \
 --train_dir ./data/pretraining/ 
 --overwrite_output_dir True 
 --save_steps 1000 \
---per_device_train_batch_size 16 \
+--per_device_train_batch_size 128 \
 --learning_rate 1e-3 \
 --num_train_epochs 40 \
---negatives_x_device True \
 ```
 
 
