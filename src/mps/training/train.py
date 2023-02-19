@@ -184,6 +184,8 @@ def train():
         # callbacks=[tb_callback]
     )
     train_dataset.trainer = trainer
+    if training_args.do_eval:
+        eval_dataset.trainer = trainer
 
     trainer.train()
     trainer.save_model()
