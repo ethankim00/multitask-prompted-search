@@ -97,8 +97,11 @@ def eval_beir(
         def get_all_qrel_doc_ids(qrels_path) -> list:
             qrel_doc_ids = []
             with open(qrels_path, "r") as f:
-                for line in f:
-                    doc_id = line.split("\t")[2]
+                # skip the header
+                for i, line in enumerate(f):
+                    if i == 0:
+                        continue
+                    doc_id = line.split("\t")[1]
                     qrel_doc_ids.append(doc_id)
             return qrel_doc_ids
 
