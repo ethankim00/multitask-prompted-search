@@ -2,7 +2,8 @@ import logging
 import os
 import sys
 import wandb
-
+import json
+import random
 from dataclasses import asdict
 import pytrec_eval
 from openmatch.arguments import DataArguments
@@ -88,6 +89,55 @@ def eval_beir(
             data_args.eval_dataset, tokenizer=tokenizer, split="test"
         )
         data_args.data_dir = eval_dir
+    corpus_dataset_path = os.path.join(data_args.data_dir, "corpus.jsonl")
+    num_lines = sum(1 for line in open(corpus_dataset_path))
+    if num_lines > 100000:
+        logger.info("Corpus dataset is greater than 100K documents")
+        # load the all the document ids from the train test and dev qrels
+        def get_all_qrel_doc_ids(qrels_path) -> list:
+            qrel_doc_ids = []
+            with open(qrels_path, "r") as f:
+                for line in f:
+                    doc_id = line.split("\t")[2]
+                    qrel_doc_ids.append(doc_id)
+            return qrel_doc_ids
+
+        all_qrel_doc_ids = []
+        for split in ["train", "test", "dev"]:
+            qrels_path = os.path.join(data_args.data_dir, "qrels", f"{split}.tsv")
+            all_qrel_doc_ids.extend(get_all_qrel_doc_ids(qrels_path))
+        corpus_dataset = {}
+        with open(corpus_dataset_path, "r") as f:
+            for line in f:
+                doc = json.loads(line)
+                corpus_dataset[doc["_id"]] = doc
+        new_corpus_dataset = []
+        for doc_id in all_qrel_doc_ids:
+            new_corpus_dataset.append(
+                {
+                    "_id": doc_id,
+                    "text": corpus_dataset[doc_id]["text"],
+                    "title": corpus_dataset[doc_id]["title"],
+                }
+            )
+            del corpus_dataset[doc_id]
+        random.seed(42)
+        random_sample = random.sample(
+            list(corpus_dataset.keys()), 100000 - len(new_corpus_dataset)
+        )
+        for doc_id in random_sample:
+            new_corpus_dataset.append(
+                {
+                    "_id": doc_id,
+                    "text": corpus_dataset[doc_id]["text"],
+                    "title": corpus_dataset[doc_id]["title"],
+                }
+            )
+        os.remove(corpus_dataset_path)
+        with open(corpus_dataset_path, "w") as f:
+            for doc in new_corpus_dataset:
+                f.write(json.dumps(doc) + "\n")
+        logger.info("Corpus dataset limited to 100K documents")
 
     beir_dataset = BEIRDataset(
         tokenizer=tokenizer,
@@ -124,11 +174,9 @@ def eval_beir(
         save_as_trec(run, encoding_args.trec_save_path)
 
         # compute metric
-        metrics=pytrec_eval.supported_measures
+        metrics = pytrec_eval.supported_measures
         metrics.add("success.20")
-        evaluator = pytrec_eval.RelevanceEvaluator(
-            beir_dataset.qrels["test"], metrics
-        )
+        evaluator = pytrec_eval.RelevanceEvaluator(beir_dataset.qrels["test"], metrics)
         eval_results = evaluator.evaluate(run)
 
         def print_line(measure, scope, value):
@@ -167,7 +215,7 @@ def eval_beir(
             wandb.init(
                 project="prompt_tuning_information_retrieval",
                 entity="ir-transfer",
-                tags= tags,
+                tags=tags,
             )
             output_dict = {}
             for args in [model_args, data_args, encoding_args]:
