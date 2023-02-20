@@ -112,39 +112,43 @@ def load_wandb_embeddings(
     for run in runs:
         if tag in run.tags:
             dataset = run.config["train_dataset"]
-            artifact_id = run.id
-            artifact = api.artifact(project + "/" + artifact_id + ":v0")
-            artifact_dir = artifact.download("./models/transfer/" + dataset)
-            open_match_config = json.load(
-                open(Path(artifact_dir).joinpath("openmatch_config.json"), "r")
-            )
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            if open_match_config["tied"]:
-                embeddings = torch.load(
-                    open(Path(artifact_dir).joinpath("pytorch_model.bin"), "rb"),
-                    map_location=device,
-                )["soft_prompt_layer.soft_embeds"].cpu().numpy()
-                embedding_dict[dataset] = embeddings
-            else:
-                query_embeddings = torch.load(
-                    open(
-                        Path(artifact_dir)
-                        .joinpath("query_model")
-                        .joinpath("pytorch_model.bin"),
-                        "rb",
-                    ),
-                    map_location=device,
-                )["soft_prompt_layer.soft_embeds"].cpu().numpy()
-                passage_embeddings = torch.load(
-                    open(
-                        Path(artifact_dir)
-                        .joinpath("passage_model")
-                        .joinpath("pytorch_model.bin"),
-                        "rb",
-                    ),
-                    map_location=device,
-                )["soft_prompt_layer.soft_embeds"].cpu().numpy()
-                embedding_dict[dataset] = (query_embeddings, passage_embeddings)
+            if dataset is not None:
+                artifact_id = run.id
+                try:
+                    artifact = api.artifact(project + "/" + artifact_id + ":v0")
+                except:
+                    logger.warning("No trained model found for source dataset {}".format(dataset))
+                artifact_dir = artifact.download("./models/transfer/" + dataset)
+                open_match_config = json.load(
+                    open(Path(artifact_dir).joinpath("openmatch_config.json"), "r")
+                )
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                if open_match_config["tied"]:
+                    embeddings = torch.load(
+                        open(Path(artifact_dir).joinpath("query_model").joinpath("pytorch_model.bin"), "rb"),
+                        map_location=device,
+                    )["soft_prompt_layer.soft_embeds"].cpu().numpy()
+                    embedding_dict[dataset] = embeddings
+                else:
+                    query_embeddings = torch.load(
+                        open(
+                            Path(artifact_dir)
+                            .joinpath("query_model")
+                            .joinpath("pytorch_model.bin"),
+                            "rb",
+                        ),
+                        map_location=device,
+                    )["soft_prompt_layer.soft_embeds"].cpu().numpy()
+                    passage_embeddings = torch.load(
+                        open(
+                            Path(artifact_dir)
+                            .joinpath("passage_model")
+                            .joinpath("pytorch_model.bin"),
+                            "rb",
+                        ),
+                        map_location=device,
+                    )["soft_prompt_layer.soft_embeds"].cpu().numpy()
+                    embedding_dict[dataset] = (query_embeddings, passage_embeddings)
   
     return embedding_dict
 
