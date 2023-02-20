@@ -101,7 +101,7 @@ def eval_beir(
                 for i, line in enumerate(f):
                     if i == 0:
                         continue
-                    doc_id = line.split("\t")[]
+                    doc_id = line.split("\t")[1]
                     qrel_doc_ids.append(doc_id)
             return qrel_doc_ids
 
