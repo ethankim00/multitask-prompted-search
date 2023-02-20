@@ -222,7 +222,7 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
 
     # # Run the evaluation
     # Construct the evaluation arguments
-    model_args = PromptModelArguments(model_name_or_path=output_dir, pooling="mean")
+    model_args = PromptModelArguments(model_name_or_path=output_dir, pooling="mean", normalize =False)
     data_args = BEIRDataArguments(
         eval_dataset=eval_args.target_dataset,
         doc_template="<title> [SEP] <text>",
