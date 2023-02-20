@@ -124,8 +124,10 @@ def eval_beir(
         save_as_trec(run, encoding_args.trec_save_path)
 
         # compute metric
+        metrics=pytrec_eval.supported_measures
+        metrics.add("success.20")
         evaluator = pytrec_eval.RelevanceEvaluator(
-            beir_dataset.qrels["test"], pytrec_eval.supported_measures
+            beir_dataset.qrels["test"], metrics
         )
         eval_results = evaluator.evaluate(run)
 
