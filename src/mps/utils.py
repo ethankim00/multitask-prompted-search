@@ -20,11 +20,16 @@ from transformers import AutoTokenizer, HfArgumentParser
 from openmatch.arguments import DataArguments
 from openmatch.dataset import InferenceDataset
 from openmatch.utils import load_beir_positives
-from src.mps.datasets import BEIR_DATASETS, CQA_DATASETS, OAG_DATASETS, TOP_LEVEL_OAG_DATASETS,  OAGBeirConverter
+from src.mps.datasets import (
+    BEIR_DATASETS,
+    CQA_DATASETS,
+    OAG_DATASETS,
+    TOP_LEVEL_OAG_DATASETS,
+    OAGBeirConverter,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 
 @dataclass
@@ -35,7 +40,6 @@ class BEIRDataArguments(DataArguments):
     eval_dataset: str = field(
         default=None, metadata={"help": "name of eval dataset to use"}
     )
-
 
 
 def download_url(url: str, save_path: str, chunk_size: int = 1024):
@@ -58,31 +62,29 @@ def download_url(url: str, save_path: str, chunk_size: int = 1024):
         for data in r.iter_content(chunk_size=chunk_size):
             size = fd.write(data)
             bar.update(size)
-            
-            
+
+
 def unzip(zip_file: str, out_dir: str):
     zip_ = zipfile.ZipFile(zip_file, "r")
     zip_.extractall(path=out_dir)
     zip_.close()
 
+
 def download_and_unzip(url: str, out_dir: str, chunk_size: int = 1024) -> str:
-    
+
     os.makedirs(out_dir, exist_ok=True)
     dataset = url.split("/")[-1]
     zip_file = os.path.join(out_dir, dataset)
-    
+
     if not os.path.isfile(zip_file):
         logger.info("Downloading {} ...".format(dataset))
         download_url(url, zip_file, chunk_size)
-    
+
     if not os.path.isdir(zip_file.replace(".zip", "")):
         logger.info("Unzipping {} ...".format(dataset))
         unzip(zip_file, out_dir)
-    
+
     return os.path.join(out_dir, dataset.replace(".zip", ""))
-
-
-
 
 
 def group_top_level_oag_topics(dataset: str) -> str:
@@ -96,31 +98,47 @@ def group_top_level_oag_topics(dataset: str) -> str:
         str: Path to new combined dataset forlder in BEIR format
     """
     lower_level_topics = TOP_LEVEL_OAG_DATASETS[dataset]
+
     def load_corpus_and_queries(lower_level_datasets: List[str]) -> List[Dict]:
         corpus = []
         queries = []
         _data_dir = "./data"
         for dataset in lower_level_datasets:
-            converter = OAGBeirConverter(
-                data_dir=Path(_data_dir).joinpath("oag_qa")
+            converter = OAGBeirConverter(data_dir=Path(_data_dir).joinpath("oag_qa"))
+            data_dir = converter.convert(
+                dataset,
             )
-            data_dir = converter.convert(dataset,)
             with open(f"{data_dir}/corpus.jsonl") as f:
-                corpus.extend([{**doc, "_id": f"{dataset}_{doc['_id']}"} for doc in [json.loads(l) for l in f]])
+                corpus.extend(
+                    [
+                        {**doc, "_id": f"{dataset}_{doc['_id']}"}
+                        for doc in [json.loads(l) for l in f]
+                    ]
+                )
             with open(f"{data_dir}/queries.jsonl") as f:
-                queries.extend([{**query, "_id": f"{dataset}_{query['_id']}"} for query in [json.loads(l) for l in f]])
+                queries.extend(
+                    [
+                        {**query, "_id": f"{dataset}_{query['_id']}"}
+                        for query in [json.loads(l) for l in f]
+                    ]
+                )
         return corpus, queries
+
     corpus, queries = load_corpus_and_queries(lower_level_topics)
-    def load_qrels(lower_level_datasets: List[str], split: str = "train") -> pd.DataFrame:
+
+    def load_qrels(
+        lower_level_datasets: List[str], split: str = "train"
+    ) -> pd.DataFrame:
         qrels = []
         for dataset in lower_level_datasets:
-            data_dir=Path("./data").joinpath("beir_{}".format(dataset))
+            data_dir = Path("./data").joinpath("beir_{}".format(dataset))
             df = pd.read_csv(f"{data_dir}/qrels/{split}.tsv", sep="\t")
             df["query-id"] = df["query-id"].apply(lambda x: f"{dataset}_{x}")
             df["corpus-id"] = df["corpus-id"].apply(lambda x: f"{dataset}_{x}")
             qrels.append(df)
         qrels = pd.concat(qrels)
         return qrels
+
     train_qrels = load_qrels(lower_level_topics, "train")
     dev_qrels = load_qrels(lower_level_topics, "dev")
     test_qrels = load_qrels(lower_level_topics, "test")
@@ -129,7 +147,7 @@ def group_top_level_oag_topics(dataset: str) -> str:
     qrels_dir = Path(output_dir).joinpath("qrels")
     os.makedirs(qrels_dir, exist_ok=True)
     train_qrels.to_csv(f"{output_dir}/qrels/train.tsv", sep="\t", index=False)
-    dev_qrels.to_csv(f"{output_dir}/qrels/dev.tsv", sep="\t",index=False)
+    dev_qrels.to_csv(f"{output_dir}/qrels/dev.tsv", sep="\t", index=False)
     test_qrels.to_csv(f"{output_dir}/qrels/test.tsv", sep="\t", index=False)
     # WRite query and corpus entries to jsonl format
     with open(f"{output_dir}/corpus.jsonl", "w") as f:
@@ -152,9 +170,7 @@ def download_dataset(dataset: str) -> str:
         out_dir = os.path.join(Path("./", data_dir))
         data_dir = download_and_unzip(url, out_dir)
     elif dataset in OAG_DATASETS:
-        converter = OAGBeirConverter(
-            data_dir=Path(data_dir).joinpath("oag_qa")
-        )
+        converter = OAGBeirConverter(data_dir=Path(data_dir).joinpath("oag_qa"))
         data_dir = converter.convert(dataset)
     elif dataset in CQA_DATASETS:
         url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/cqadupstack.zip"
@@ -259,6 +275,24 @@ def process_one(query_dataset, corpus_dataset, q, poss):
     return train_example
 
 
+def filter_metadata(query_path):
+    """
+    Load the jsonl file and remove the metadata column from the dictionary.
+
+    Args:
+        query_path (Path): Path to the jsonl file
+    """
+    with open(query_path, "r") as f:
+        data = [json.loads(line) for line in f]
+    for item in data:
+        item.pop("metadata", None)
+    # delete the old jsonl file
+    os.remove(query_path)
+    with open(query_path, "w") as f:
+        for item in data:
+            f.write(json.dumps(item) + "\n")
+
+
 def construct_beir_dataset(dataset_name: str, tokenizer, split: str = "train"):
     data_dir = download_dataset(dataset_name)
     validate_data_splits(data_dir)
@@ -271,6 +305,9 @@ def construct_beir_dataset(dataset_name: str, tokenizer, split: str = "train"):
         query_template="<text>",
         doc_template="<title> [SEP] <text>",
     )
+    if dataset_name in ["fever", "hotpotqa"]:
+        # filter the metadata column from the queries jsonl file
+        filter_metadata(data_args.query_path)
 
     query_dataset = InferenceDataset.load(
         tokenizer=tokenizer,
