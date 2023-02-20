@@ -110,46 +110,65 @@ def load_wandb_embeddings(
     runs = api.runs(project)
     embedding_dict = {}
     for run in runs:
-        if tag in run.tags:
+        if (tag in run.tags) and ("train" in run.tags):
             dataset = run.config["train_dataset"]
             if dataset is not None:
                 artifact_id = run.id
                 try:
                     artifact = api.artifact(project + "/" + artifact_id + ":v0")
                 except:
-                    logger.warning("No trained model found for source dataset {}".format(dataset))
+                    logger.warning(
+                        "No trained model found for source dataset {}".format(dataset)
+                    )
                 artifact_dir = artifact.download("./models/transfer/" + dataset)
                 open_match_config = json.load(
                     open(Path(artifact_dir).joinpath("openmatch_config.json"), "r")
                 )
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 if open_match_config["tied"]:
-                    embeddings = torch.load(
-                        open(Path(artifact_dir).joinpath("query_model").joinpath("pytorch_model.bin"), "rb"),
-                        map_location=device,
-                    )["soft_prompt_layer.soft_embeds"].cpu().numpy()
+                    embeddings = (
+                        torch.load(
+                            open(
+                                Path(artifact_dir)
+                                .joinpath("query_model")
+                                .joinpath("pytorch_model.bin"),
+                                "rb",
+                            ),
+                            map_location=device,
+                        )["soft_prompt_layer.soft_embeds"]
+                        .cpu()
+                        .numpy()
+                    )
                     embedding_dict[dataset] = embeddings
                 else:
-                    query_embeddings = torch.load(
-                        open(
-                            Path(artifact_dir)
-                            .joinpath("query_model")
-                            .joinpath("pytorch_model.bin"),
-                            "rb",
-                        ),
-                        map_location=device,
-                    )["soft_prompt_layer.soft_embeds"].cpu().numpy()
-                    passage_embeddings = torch.load(
-                        open(
-                            Path(artifact_dir)
-                            .joinpath("passage_model")
-                            .joinpath("pytorch_model.bin"),
-                            "rb",
-                        ),
-                        map_location=device,
-                    )["soft_prompt_layer.soft_embeds"].cpu().numpy()
+                    query_embeddings = (
+                        torch.load(
+                            open(
+                                Path(artifact_dir)
+                                .joinpath("query_model")
+                                .joinpath("pytorch_model.bin"),
+                                "rb",
+                            ),
+                            map_location=device,
+                        )["soft_prompt_layer.soft_embeds"]
+                        .cpu()
+                        .numpy()
+                    )
+                    passage_embeddings = (
+                        torch.load(
+                            open(
+                                Path(artifact_dir)
+                                .joinpath("passage_model")
+                                .joinpath("pytorch_model.bin"),
+                                "rb",
+                            ),
+                            map_location=device,
+                        )["soft_prompt_layer.soft_embeds"]
+                        .cpu()
+                        .numpy()
+                    )
                     embedding_dict[dataset] = (query_embeddings, passage_embeddings)
-  
+
     return embedding_dict
 
 
@@ -180,7 +199,7 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
         embedding_dict = load_wandb_embeddings(eval_args.source_dataset_group)
     else:
         embedding_dict = None
-    domains=list(embedding_dict.keys())
+    domains = list(embedding_dict.keys())
     if eval_args.target_dataset not in domains:
         domains.append(eval_args.target_dataset)
     domain_similarity = DomainSimilarity(
@@ -222,13 +241,17 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
 
     # # Run the evaluation
     # Construct the evaluation arguments
-    model_args = PromptModelArguments(model_name_or_path=output_dir, pooling="mean", normalize =False)
+    model_args = PromptModelArguments(
+        model_name_or_path=output_dir, pooling="mean", normalize=False
+    )
     data_args = BEIRDataArguments(
         eval_dataset=eval_args.target_dataset,
         doc_template="<title> [SEP] <text>",
         query_template="<text>",
     )
-    encoding_args = EncodingArguments(output_dir = os.path.join(output_dir,"eval"))
+    encoding_args = EncodingArguments(
+        output_dir=os.path.join(output_dir, "eval"), per_device_eval_batch_size=1024
+    )
     eval_beir(model_args=model_args, data_args=data_args, encoding_args=encoding_args)
 
 
