@@ -101,7 +101,7 @@ def eval_beir(
                 for i, line in enumerate(f):
                     if i == 0:
                         continue
-                    doc_id = line.split("\t")[1]
+                    doc_id = line.split("\t")[]
                     qrel_doc_ids.append(doc_id)
             return qrel_doc_ids
 
@@ -115,6 +115,7 @@ def eval_beir(
                 doc = json.loads(line)
                 corpus_dataset[doc["_id"]] = doc
         new_corpus_dataset = []
+        all_qrel_doc_ids = list(set(all_qrel_doc_ids))
         for doc_id in all_qrel_doc_ids:
             new_corpus_dataset.append(
                 {
