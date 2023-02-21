@@ -222,7 +222,7 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
         + str(eval_args.top_k)
     )
     # output_dir.mkdir(parents=True, exist_ok=True)
-    source_model_path = "models/transfer/" + source_datasets[0]
+    source_model_path = "models/transfer/" + source_datasets[1]
 
     copytree(source_model_path, output_dir)
     if isinstance(prompt_embeddings, tuple):
