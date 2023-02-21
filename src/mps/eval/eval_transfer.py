@@ -208,7 +208,9 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     scores = domain_similarity.return_domain_similarities(
         eval_args.target_dataset, k=eval_args.top_k
     )
+    logger.info("Domain Similarity Scores: {}".format(scores))
     weights = get_weights(scores, temperature=eval_args.temperature)
+    logger.info("Soft prmpt weights: \n {}".format(weights))
     if os.getenv("WANDB_DISABLED") != "True":
         wandb.log({"weights": weights})
     prompt_embeddings = get_weighted_prompts(weights, embedding_dict)
@@ -236,7 +238,7 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     else:
         torch.save(
             {"soft_prompt_layer.soft_embeds": torch.from_numpy(prompt_embeddings)},
-            output_dir.joinpath("pytorch_model.bin"),
+            output_dir.joinpath("query_model").joinpath("pytorch_model.bin"),
         )
 
     # # Run the evaluation
@@ -246,7 +248,7 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     )
     data_args = BEIRDataArguments(
         eval_dataset=eval_args.target_dataset,
-        doc_template="<title> [SEP] <text>",
+        doc_template="<title> <text>",
         query_template="<text>",
     )
     encoding_args = EncodingArguments(

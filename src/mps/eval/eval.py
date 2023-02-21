@@ -212,7 +212,7 @@ def eval_beir(
                 "all",
                 value,
             )
-            results["measure"] = value
+            results[measure] = value
         if os.getenv("WANDB_DISABLED") != "True":
             tags = ["eval"]
             tags += DATASET_GROUPS_MAPPING[data_args.eval_dataset]
@@ -223,9 +223,10 @@ def eval_beir(
             )
             output_dict = {}
             for args in [model_args, data_args, encoding_args]:
-                output_dict.update(asdict(args), allow_val_change=True)
+                output_dict.update(asdict(args))
             output_dict.update(results)
-            wandb.config.update(output_dict)
+            print(output_dict)
+            wandb.config.update(output_dict, allow_val_change=True)
             wandb.log(results)
 
 
