@@ -112,6 +112,8 @@ def load_wandb_embeddings(
     for run in runs:
         if (tag in run.tags) and ("train" in run.tags):
             dataset = run.config["train_dataset"]
+            if run.config["model_name_or_path"] != "./models/dpr_pretrain_1_hard_neg_bs_128_40ep/checkpoint-17000/": #40ep/checkpoint-17000/
+                continue
             if dataset is not None:
                 artifact_id = run.id
                 try:
@@ -181,6 +183,8 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
         for run in runs
         if eval_args.source_dataset_group in run.tags
     ]
+    source_datasets = [d for d in source_datasets if d is not None]
+    source_datasets = list(set(source_datasets))
     for dataset in source_datasets:
         data_path = download_dataset(dataset)
         validate_data_splits(data_path)
@@ -202,6 +206,7 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     domains = list(embedding_dict.keys())
     if eval_args.target_dataset not in domains:
         domains.append(eval_args.target_dataset)
+    domains = [domain for domain in domains if domain not in ["scidocs", "trec-covid"]]
     domain_similarity = DomainSimilarity(
         domains=domains, method=eval_args.similarity_method
     )
@@ -222,8 +227,12 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
         + str(eval_args.top_k)
     )
     # output_dir.mkdir(parents=True, exist_ok=True)
-    source_model_path = "models/transfer/" + source_datasets[1]
-
+    source_model_path = "models/transfer/" + source_datasets[0]
+    import shutil
+    try:
+        shutil.rmtree(output_dir)
+    except:
+        pass
     copytree(source_model_path, output_dir)
     if isinstance(prompt_embeddings, tuple):
         query_embeddings, passage_embeddings = prompt_embeddings
@@ -244,12 +253,14 @@ def eval_transfer(eval_args: TransferEvaluationArguments):
     # # Run the evaluation
     # Construct the evaluation arguments
     model_args = PromptModelArguments(
-        model_name_or_path=output_dir, pooling="mean", normalize=False
+        model_name_or_path=output_dir, pooling="mean", normalize=True
     )
     data_args = BEIRDataArguments(
         eval_dataset=eval_args.target_dataset,
         doc_template="<title> <text>",
         query_template="<text>",
+        q_max_len = 64, 
+        p_max_len = 256,
     )
     encoding_args = EncodingArguments(
         output_dir=os.path.join(output_dir, "eval"), per_device_eval_batch_size=1024
