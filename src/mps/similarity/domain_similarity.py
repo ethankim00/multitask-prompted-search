@@ -7,8 +7,10 @@ from abc import ABC
 import json
 from pathlib import Path
 
+from src.mps.utils import download_dataset
 
 from src.mps.datasets import CQA_DATASETS
+from src.mps.datasets import TOP_LEVEL_OAG_DATASETS
 
 
 class DomainFeatureExtractor(ABC):
@@ -48,6 +50,8 @@ class UnsupervisedDomainFeatureExtractor(DomainFeatureExtractor):
     ) -> Iterable[str]:
         if domain in CQA_DATASETS:
             domain = "cqadupstack" + "/" + domain
+        elif domain in TOP_LEVEL_OAG_DATASETS:
+            domain = "oag_qa_top_level" + "/" + domain
         folder_path = Path(self.data_dir).joinpath(domain)
         document_path = folder_path.joinpath(file_name)
         document_list = []
